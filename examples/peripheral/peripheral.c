@@ -34,8 +34,19 @@
 #include "parser.h"
 
 #define TAG "Main"
-#define HTS_SERVICE_UUID "00001809-0000-1000-8000-00805f9b34fb"
-#define TEMPERATURE_CHAR_UUID "00002a1c-0000-1000-8000-00805f9b34fb"
+
+#define VEHICLE_SERVICE_UUID "00001809-0000-1000-8000-00805f9b34fb"
+#define CAN_CHAR_UUID "00002a10-0000-1000-8000-00805f9b34fb"
+#define GPS_CHAR_UUID "00002a11-0000-1000-8000-00805f9b34fb"
+#define GPS_FREQ_CHAR_UUID "00002a12-0000-1000-8000-00805f9b34fb"
+#define CAN_FREQ_CHAR_UUID "00002a13-0000-1000-8000-00805f9b34fb"
+#define IMU_FREQ_CHAR_UUID "00002a14-0000-1000-8000-00805f9b34fb"
+#define UNLOCK_VEHICLE_CHAR_UUID "00002a15-0000-1000-8000-00805f9b34fb"
+
+#define AUTH_SERVICE_UUID "00001810-0000-1000-8000-00805f9b34fb"
+#define PASSWORD_CHAR_UUID "00003a10-0000-1000-8000-00805f9b34fb"
+#define IS_AUTHENTICATED_CHAR_UUID "00003a11-0000-1000-8000-00805f9b34fb"
+
 #define CUD_CHAR "00002901-0000-1000-8000-00805f9b34fb"
 
 GMainLoop *loop = NULL;
@@ -64,30 +75,38 @@ void on_central_state_changed(Adapter *adapter, Device *device) {
 
 const char *on_local_char_read(const Application *application, const char *address, const char *service_uuid,
                         const char *char_uuid) {
-    if (g_str_equal(service_uuid, HTS_SERVICE_UUID) && g_str_equal(char_uuid, TEMPERATURE_CHAR_UUID)) {
-        const guint8 bytes[] = {0x06, 0x6f, 0x01, 0x00, 0xff, 0xe6, 0x07, 0x03, 0x03, 0x10, 0x04, 0x00, 0x01};
-        GByteArray *byteArray = g_byte_array_sized_new(sizeof(bytes));
-        g_byte_array_append(byteArray, bytes, sizeof(bytes));
-        binc_application_set_char_value(application, service_uuid, char_uuid, byteArray);
-        return NULL;
-    }
+
+    log_debug(TAG, "on char read");
+    
+    // if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, TEMPERATURE_CHAR_UUID)) {
+    //     const guint8 bytes[] = {0x06, 0x6f, 0x01, 0x00, 0xff, 0xe6, 0x07, 0x03, 0x03, 0x10, 0x04, 0x00, 0x01};
+    //     GByteArray *byteArray = g_byte_array_sized_new(sizeof(bytes));
+    //     g_byte_array_append(byteArray, bytes, sizeof(bytes));
+    //     binc_application_set_char_value(application, service_uuid, char_uuid, byteArray);
+    //     return NULL;
+    // }
+
     return BLUEZ_ERROR_REJECTED;
 }
 
 const char *on_local_char_write(const Application *application, const char *address, const char *service_uuid,
                           const char *char_uuid, GByteArray *byteArray) {
+
+    log_debug(TAG, "on char write");
+
     return NULL;
 }
 
 void on_local_char_start_notify(const Application *application, const char *service_uuid, const char *char_uuid) {
     log_debug(TAG, "on start notify");
-    if (g_str_equal(service_uuid, HTS_SERVICE_UUID) && g_str_equal(char_uuid, TEMPERATURE_CHAR_UUID)) {
-        const guint8 bytes[] = {0x06, 0x6A, 0x01, 0x00, 0xff, 0xe6, 0x07, 0x03, 0x03, 0x10, 0x04, 0x00, 0x01};
-        GByteArray *byteArray = g_byte_array_sized_new(sizeof(bytes));
-        g_byte_array_append(byteArray, bytes, sizeof(bytes));
-        binc_application_notify(application, service_uuid, char_uuid, byteArray);
-        g_byte_array_free(byteArray, TRUE);
-    }
+
+    // if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, TEMPERATURE_CHAR_UUID)) {
+    //     const guint8 bytes[] = {0x06, 0x6A, 0x01, 0x00, 0xff, 0xe6, 0x07, 0x03, 0x03, 0x10, 0x04, 0x00, 0x01};
+    //     GByteArray *byteArray = g_byte_array_sized_new(sizeof(bytes));
+    //     g_byte_array_append(byteArray, bytes, sizeof(bytes));
+    //     binc_application_notify(application, service_uuid, char_uuid, byteArray);
+    //     g_byte_array_free(byteArray, TRUE);
+    // }
 }
 
 void on_local_char_stop_notify(const Application *application, const char *service_uuid, const char *char_uuid) {
@@ -122,7 +141,79 @@ static void cleanup_handler(int signo) {
     }
 }
 
+void ble_install_vehicle_service()
+{
+    log_info(TAG, "Adding Vehicle Service\r\n");
+
+    binc_application_add_service(app, VEHICLE_SERVICE_UUID);
+
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            CAN_CHAR_UUID,
+            GATT_CHR_PROP_NOTIFY);
+    
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            GPS_CHAR_UUID,
+            GATT_CHR_PROP_NOTIFY);
+    
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            GPS_FREQ_CHAR_UUID,
+            GATT_CHR_PROP_WRITE);
+    
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            CAN_FREQ_CHAR_UUID,
+            GATT_CHR_PROP_WRITE);
+    
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            IMU_FREQ_CHAR_UUID,
+            GATT_CHR_PROP_WRITE);
+    
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            UNLOCK_VEHICLE_CHAR_UUID,
+            GATT_CHR_PROP_WRITE);
+
+    // binc_application_add_descriptor(
+    //         app,
+    //         VEHICLE_SERVICE_UUID,
+    //         TEMPERATURE_CHAR_UUID,
+    //         CUD_CHAR,
+    //         GATT_CHR_PROP_READ | GATT_CHR_PROP_WRITE);
+}
+
+void ble_install_auth_service()
+{
+    log_info(TAG, "Adding Auth Service\r\n");
+
+    binc_application_add_service(app, AUTH_SERVICE_UUID);
+
+    binc_application_add_characteristic(
+            app,
+            AUTH_SERVICE_UUID,
+            PASSWORD_CHAR_UUID,
+            GATT_CHR_PROP_WRITE);
+    
+    binc_application_add_characteristic(
+            app,
+            AUTH_SERVICE_UUID,
+            IS_AUTHENTICATED_CHAR_UUID,
+            GATT_CHR_PROP_READ);
+}
+
 int main(void) {
+
+    log_set_level(LOG_DEBUG);
+
     // Get a DBus connection
     GDBusConnection *dbusConnection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
 
@@ -150,33 +241,25 @@ int main(void) {
 
         // Setup advertisement
         GPtrArray *adv_service_uuids = g_ptr_array_new();
-        g_ptr_array_add(adv_service_uuids, HTS_SERVICE_UUID);
+        g_ptr_array_add(adv_service_uuids, VEHICLE_SERVICE_UUID);
+        g_ptr_array_add(adv_service_uuids, AUTH_SERVICE_UUID);
 
         advertisement = binc_advertisement_create();
-        binc_advertisement_set_local_name(advertisement, "BINC");
+        binc_advertisement_set_local_name(advertisement, "iWave-BLE");
         binc_advertisement_set_services(advertisement, adv_service_uuids);
         g_ptr_array_free(adv_service_uuids, TRUE);
         binc_adapter_start_advertising(default_adapter, advertisement);
 
         // Start application
         app = binc_create_application(default_adapter);
-        binc_application_add_service(app, HTS_SERVICE_UUID);
-        binc_application_add_characteristic(
-                app,
-                HTS_SERVICE_UUID,
-                TEMPERATURE_CHAR_UUID,
-                GATT_CHR_PROP_INDICATE);
-        binc_application_add_descriptor(
-                app,
-                HTS_SERVICE_UUID,
-                TEMPERATURE_CHAR_UUID,
-                CUD_CHAR,
-                GATT_CHR_PROP_READ | GATT_CHR_PROP_WRITE);
 
-        const guint8 cud[] = "hello there";
-        GByteArray *cudArray = g_byte_array_sized_new(sizeof(cud));
-        g_byte_array_append(cudArray, cud, sizeof(cud));
-        binc_application_set_desc_value(app, HTS_SERVICE_UUID, TEMPERATURE_CHAR_UUID, CUD_CHAR, cudArray);
+        ble_install_vehicle_service();
+        ble_install_auth_service();
+
+        // const guint8 cud[] = "hello there";
+        // GByteArray *cudArray = g_byte_array_sized_new(sizeof(cud));
+        // g_byte_array_append(cudArray, cud, sizeof(cud));
+        // binc_application_set_desc_value(app, VEHICLE_SERVICE_UUID, TEMPERATURE_CHAR_UUID, CUD_CHAR, cudArray);
 
         binc_application_set_char_read_cb(app, &on_local_char_read);
         binc_application_set_char_write_cb(app, &on_local_char_write);
