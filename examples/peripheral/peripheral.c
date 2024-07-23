@@ -44,13 +44,14 @@
 #define IMU_FREQ_CHAR_UUID "00002a14-0000-1000-8000-00805f9b34fb"
 #define UNLOCK_VEHICLE_CHAR_UUID "00002a15-0000-1000-8000-00805f9b34fb"
 
-#define AUTH_SERVICE_UUID "0000A00000001000800000805F9B34FB"
-#define PASSWORD_CHAR_UUID "0000A00100001000800000805F9B34FB"
-#define IS_AUTHENTICATED_CHAR_UUID "0000A00200001000800000805F9B34FB"
+#define AUTH_SERVICE_UUID "0000a000-0000-1000-8000-00805f9b34fb"
+#define PASSWORD_CHAR_UUID "0000a001-0000-1000-8000-00805f9b34fb"
+#define IS_AUTHENTICATED_CHAR_UUID "0000a002-0000-1000-8000-00805f9b34fb"
 
 #define CUD_CHAR "00002901-0000-1000-8000-00805f9b34fb"
 
 #define DEFAULT_PASSWORD 0x123456
+#define DEFAULT_PASSWORD_LEN 3
 
 #define BLUEZ_ERROR_AUTHORIZATION_FAILED "org.bluez.Error.Failed"
 
@@ -163,27 +164,40 @@ const char *on_local_char_read(const Application *application, const char *addre
     return BLUEZ_ERROR_REJECTED;
 }
 
+
+#define DEFAULT_PASSWORD 0x123456
+#define DEFAULT_PASSWORD_LEN 3
+
 const char *on_local_char_write(const Application *application, const char *address, const char *service_uuid,
-                          const char *char_uuid, GByteArray *byteArray) {
+                                const char *char_uuid, GByteArray *byteArray) {
 
     log_debug(TAG, "on char write");
 
     if (g_str_equal(service_uuid, AUTH_SERVICE_UUID) && g_str_equal(char_uuid, PASSWORD_CHAR_UUID)) {
-        if (byteArray->len != sizeof(uint32_t)) {
-            log_error(TAG, "Invalid password length");
+        log_debug(TAG, "Password write received, length: %d", byteArray->len);
+        
+        if (byteArray->len != DEFAULT_PASSWORD_LEN) {
+            log_error(TAG, "Invalid password length: %d (expected %d)", byteArray->len, DEFAULT_PASSWORD_LEN);
             return BLUEZ_ERROR_INVALID_VALUE_LENGTH;
         }
 
-        uint32_t received_password;
-        memcpy(&received_password, byteArray->data, sizeof(received_password));
+        // Manually construct the received password from the byte array
+        uint32_t received_password = 0;
+        received_password |= byteArray->data[0];
+        received_password <<= 8;
+        received_password |= byteArray->data[1];
+        received_password <<= 8;
+        received_password |= byteArray->data[2];
+
+        log_debug(TAG, "Received password: 0x%06x", received_password);
 
         if (received_password == DEFAULT_PASSWORD) {
             is_authenticated = TRUE;
 
             // Write "yes" to IS_AUTHENTICATED_CHAR_UUID
-            const char *yes_value = "yes";
+            const uint8_t yes_value[] = {'y', 'e', 's'};
             GByteArray *yesArray = g_byte_array_new();
-            g_byte_array_append(yesArray, (const guint8 *)yes_value, strlen(yes_value));
+            g_byte_array_append(yesArray, yes_value, sizeof(yes_value));
             binc_application_set_char_value(application, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, yesArray);
             g_byte_array_free(yesArray, TRUE);
 
@@ -199,6 +213,7 @@ const char *on_local_char_write(const Application *application, const char *addr
 
     return NULL;
 }
+
 
 void on_local_char_start_notify(const Application *application, const char *service_uuid, const char *char_uuid) {
     log_debug(TAG, "on start notify");
