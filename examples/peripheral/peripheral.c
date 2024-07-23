@@ -36,13 +36,15 @@
 
 #define TAG "Main"
 
-#define VEHICLE_SERVICE_UUID "00001809-0000-1000-8000-00805f9b34fb"
-#define CAN_CHAR_UUID "00002a10-0000-1000-8000-00805f9b34fb"
-#define GPS_CHAR_UUID "00002a11-0000-1000-8000-00805f9b34fb"
-#define GPS_FREQ_CHAR_UUID "00002a12-0000-1000-8000-00805f9b34fb"
-#define CAN_FREQ_CHAR_UUID "00002a13-0000-1000-8000-00805f9b34fb"
-#define IMU_FREQ_CHAR_UUID "00002a14-0000-1000-8000-00805f9b34fb"
-#define UNLOCK_VEHICLE_CHAR_UUID "00002a15-0000-1000-8000-00805f9b34fb"
+#define VEHICLE_SERVICE_UUID "0000fff0-0000-1000-8000-00805f9b34fb"
+#define CAN_CHAR_UUID "0000fff1-0000-1000-8000-00805f9b34fb"
+
+#define GPS_CHAR_UUID "0000fff2-0000-1000-8000-00805f9b34fb"
+#define GPS_FREQ_CHAR_UUID "0000fff3-0000-1000-8000-00805f9b34fb"
+
+#define CAN_FREQ_CHAR_UUID "0000fff4-0000-1000-8000-00805f9b34fb"
+#define IMU_FREQ_CHAR_UUID "0000fff5-0000-1000-8000-00805f9b34fb"
+#define UNLOCK_VEHICLE_CHAR_UUID "0000fff6-0000-1000-8000-00805f9b34fb"
 
 #define AUTH_SERVICE_UUID "0000a000-0000-1000-8000-00805f9b34fb"
 #define PASSWORD_CHAR_UUID "0000a001-0000-1000-8000-00805f9b34fb"
@@ -167,9 +169,6 @@ const char *on_local_char_read(const Application *application, const char *addre
 }
 
 
-#define DEFAULT_PASSWORD 0x123456
-#define DEFAULT_PASSWORD_LEN 3
-
 const char *on_local_char_write(const Application *application, const char *address, const char *service_uuid,
                                 const char *char_uuid, GByteArray *byteArray) {
 
@@ -207,9 +206,11 @@ const char *on_local_char_write(const Application *application, const char *addr
             log_info(TAG, "Authentication successful, 'yes' written to IS_AUTHENTICATED_CHAR_UUID");
 
             // Make VEHICLE_SERVICE_UUID visible
-            ble_install_vehicle_service();
+            //ble_install_vehicle_service();
         } else {
             log_error(TAG, "Authentication failed, received password: 0x%06x", received_password);
+				//disconnect the device
+				binc_device_disconnect(connected_device);
             return BLUEZ_ERROR_AUTHORIZATION_FAILED;
         }
     }
@@ -300,6 +301,7 @@ int main(void) {
 
         // Install services
         ble_install_auth_service();
+        ble_install_vehicle_service();
 
         binc_application_set_char_read_cb(app, &on_local_char_read);
         binc_application_set_char_write_cb(app, &on_local_char_write);
