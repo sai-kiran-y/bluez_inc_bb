@@ -737,9 +737,11 @@ static int binc_characteristic_set_value(const Application *application, LocalCh
 
     GString *byteArrayStr = g_byte_array_as_hex(byteArray);
     log_debug(TAG, "set value <%s> to <%s>", byteArrayStr->str, characteristic->uuid);
+	 log_debug(TAG, "free byteArrayStr = GByteArray");
     g_string_free(byteArrayStr, TRUE);
 
     if (characteristic->value != NULL) {
+	 	  log_debug(TAG, "free characteristic->value");
         g_byte_array_free(characteristic->value, TRUE);
     }
     characteristic->value = byteArray;
