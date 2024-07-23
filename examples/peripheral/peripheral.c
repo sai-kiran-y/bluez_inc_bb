@@ -60,6 +60,7 @@ Adapter *default_adapter = NULL;
 Advertisement *advertisement = NULL;
 Application *app = NULL;
 static gboolean is_authenticated = FALSE;
+Device *connected_device = NULL;
 
 void ble_install_vehicle_service()
 {
@@ -138,6 +139,7 @@ void on_central_state_changed(Adapter *adapter, Device *device) {
     char *deviceToString = binc_device_to_string(device);
     log_debug(TAG, deviceToString);
     g_free(deviceToString);
+	 connected_device = device;
 
     log_debug(TAG, "remote central %s is %s", binc_device_get_address(device), binc_device_get_connection_state_name(device));
     ConnectionState state = binc_device_get_connection_state(device);
@@ -178,6 +180,7 @@ const char *on_local_char_write(const Application *application, const char *addr
         
         if (byteArray->len != DEFAULT_PASSWORD_LEN) {
             log_error(TAG, "Invalid password length: %d (expected %d)", byteArray->len, DEFAULT_PASSWORD_LEN);
+				binc_device_disconnect(connected_device);
             return BLUEZ_ERROR_INVALID_VALUE_LENGTH;
         }
 
