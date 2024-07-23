@@ -32,6 +32,7 @@
 #include "advertisement.h"
 #include "utility.h"
 #include "parser.h"
+#include <stdint.h>
 
 #define TAG "Main"
 
@@ -51,11 +52,82 @@
 
 #define DEFAULT_PASSWORD 0x123456
 
+#define BLUEZ_ERROR_AUTHORIZATION_FAILED "org.bluez.Error.Failed"
+
 GMainLoop *loop = NULL;
 Adapter *default_adapter = NULL;
 Advertisement *advertisement = NULL;
 Application *app = NULL;
 static gboolean is_authenticated = FALSE;
+
+void ble_install_vehicle_service()
+{
+    log_info(TAG, "Adding Vehicle Service\r\n");
+
+    binc_application_add_service(app, VEHICLE_SERVICE_UUID);
+
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            CAN_CHAR_UUID,
+            GATT_CHR_PROP_NOTIFY);
+    
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            GPS_CHAR_UUID,
+            GATT_CHR_PROP_NOTIFY);
+    
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            GPS_FREQ_CHAR_UUID,
+            GATT_CHR_PROP_WRITE);
+    
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            CAN_FREQ_CHAR_UUID,
+            GATT_CHR_PROP_WRITE);
+    
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            IMU_FREQ_CHAR_UUID,
+            GATT_CHR_PROP_WRITE);
+    
+    binc_application_add_characteristic(
+            app,
+            VEHICLE_SERVICE_UUID,
+            UNLOCK_VEHICLE_CHAR_UUID,
+            GATT_CHR_PROP_WRITE);
+
+    // binc_application_add_descriptor(
+    //         app,
+    //         VEHICLE_SERVICE_UUID,
+    //         TEMPERATURE_CHAR_UUID,
+    //         CUD_CHAR,
+    //         GATT_CHR_PROP_READ | GATT_CHR_PROP_WRITE);
+}
+
+void ble_install_auth_service()
+{
+    log_info(TAG, "Adding Auth Service\r\n");
+
+    binc_application_add_service(app, AUTH_SERVICE_UUID);
+
+    binc_application_add_characteristic(
+            app,
+            AUTH_SERVICE_UUID,
+            PASSWORD_CHAR_UUID,
+            GATT_CHR_PROP_WRITE);
+    
+    binc_application_add_characteristic(
+            app,
+            AUTH_SERVICE_UUID,
+            IS_AUTHENTICATED_CHAR_UUID,
+            GATT_CHR_PROP_READ);
+}
 
 void on_powered_state_changed(Adapter *adapter, gboolean state) {
     log_debug(TAG, "powered '%s' (%s)", state ? "on" : "off", binc_adapter_get_path(adapter));
@@ -164,74 +236,6 @@ static void cleanup_handler(int signo) {
     }
 }
 
-void ble_install_vehicle_service()
-{
-    log_info(TAG, "Adding Vehicle Service\r\n");
-
-    binc_application_add_service(app, VEHICLE_SERVICE_UUID);
-
-    binc_application_add_characteristic(
-            app,
-            VEHICLE_SERVICE_UUID,
-            CAN_CHAR_UUID,
-            GATT_CHR_PROP_NOTIFY);
-    
-    binc_application_add_characteristic(
-            app,
-            VEHICLE_SERVICE_UUID,
-            GPS_CHAR_UUID,
-            GATT_CHR_PROP_NOTIFY);
-    
-    binc_application_add_characteristic(
-            app,
-            VEHICLE_SERVICE_UUID,
-            GPS_FREQ_CHAR_UUID,
-            GATT_CHR_PROP_WRITE);
-    
-    binc_application_add_characteristic(
-            app,
-            VEHICLE_SERVICE_UUID,
-            CAN_FREQ_CHAR_UUID,
-            GATT_CHR_PROP_WRITE);
-    
-    binc_application_add_characteristic(
-            app,
-            VEHICLE_SERVICE_UUID,
-            IMU_FREQ_CHAR_UUID,
-            GATT_CHR_PROP_WRITE);
-    
-    binc_application_add_characteristic(
-            app,
-            VEHICLE_SERVICE_UUID,
-            UNLOCK_VEHICLE_CHAR_UUID,
-            GATT_CHR_PROP_WRITE);
-
-    // binc_application_add_descriptor(
-    //         app,
-    //         VEHICLE_SERVICE_UUID,
-    //         TEMPERATURE_CHAR_UUID,
-    //         CUD_CHAR,
-    //         GATT_CHR_PROP_READ | GATT_CHR_PROP_WRITE);
-}
-
-void ble_install_auth_service()
-{
-    log_info(TAG, "Adding Auth Service\r\n");
-
-    binc_application_add_service(app, AUTH_SERVICE_UUID);
-
-    binc_application_add_characteristic(
-            app,
-            AUTH_SERVICE_UUID,
-            PASSWORD_CHAR_UUID,
-            GATT_CHR_PROP_WRITE);
-    
-    binc_application_add_characteristic(
-            app,
-            AUTH_SERVICE_UUID,
-            IS_AUTHENTICATED_CHAR_UUID,
-            GATT_CHR_PROP_READ);
-}
 
 int main(void) {
 
