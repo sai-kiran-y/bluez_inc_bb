@@ -735,15 +735,19 @@ static int binc_characteristic_set_value(const Application *application, LocalCh
     g_return_val_if_fail (characteristic != NULL, EINVAL);
     g_return_val_if_fail (byteArray != NULL, EINVAL);
 
+    log_debug(TAG, "inside binc_characteristic_set_value");
     GString *byteArrayStr = g_byte_array_as_hex(byteArray);
     log_debug(TAG, "set value <%s> to <%s>", byteArrayStr->str, characteristic->uuid);
-	 log_debug(TAG,"freeing byteArrayStr=GByteArray\n");
+	log_debug(TAG,"freeing byteArrayStr=GByteArray");
     g_string_free(byteArrayStr, TRUE);
+	log_debug(TAG,"freed byteArrayStr=GByteArray");
 
+	
     if (characteristic->value != NULL) {
-	 	log_debug(TAG,"freeing characteristic->value=%d\n", characteristic->value);
+	 	log_debug(TAG,"freeing characteristic->value=%d", characteristic->value);
         g_byte_array_free(characteristic->value, TRUE);
     }
+    log_debug(TAG, "freed characteristic->value");
     characteristic->value = byteArray;
 
     if (application->on_char_updated != NULL) {
@@ -947,7 +951,7 @@ int binc_application_add_descriptor(Application *application, const char *servic
 
 int binc_application_set_char_value(const Application *application, const char *service_uuid,
                                     const char *char_uuid, GByteArray *byteArray) {
-
+	log_debug(TAG, "inside binc_application_set_char_value"); 
     g_return_val_if_fail (application != NULL, EINVAL);
     g_return_val_if_fail (service_uuid != NULL, EINVAL);
     g_return_val_if_fail (char_uuid != NULL, EINVAL);
@@ -955,12 +959,18 @@ int binc_application_set_char_value(const Application *application, const char *
     g_return_val_if_fail (is_valid_uuid(service_uuid), EINVAL);
     g_return_val_if_fail (is_valid_uuid(char_uuid), EINVAL);
 
+	log_debug(TAG, "calling get_local_characteristic"); 
     LocalCharacteristic *characteristic = get_local_characteristic(application, service_uuid, char_uuid);
+	log_debug(TAG, "after calling get_local_characteristic, characteristic = %d", characteristic); 
     if (characteristic == NULL) {
         g_critical("%s: characteristic with uuid %s does not exist", G_STRFUNC, char_uuid);
         return EINVAL;
     }
 
+	if (byteArray == NULL) {
+		log_error(TAG, "byteArray is NULL");
+	}
+	log_debug(TAG, "calling binc_characteristic_set_value: bytearray=%d", byteArray); 
     return binc_characteristic_set_value(application, characteristic, byteArray);
 }
 

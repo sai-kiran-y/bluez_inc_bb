@@ -160,7 +160,9 @@ const char *on_local_char_read(const Application *application, const char *addre
     if (g_str_equal(service_uuid, AUTH_SERVICE_UUID) && g_str_equal(char_uuid, IS_AUTHENTICATED_CHAR_UUID)) {
         const char *value = is_authenticated ? "yes" : "no";
         GByteArray *byteArray = g_byte_array_new();
+    	log_debug(TAG, "calling g_byte_array_append");
         g_byte_array_append(byteArray, (const guint8 *)value, strlen(value));
+    	log_debug(TAG, "calling gbinc_application_set_char_value");
         binc_application_set_char_value(application, service_uuid, char_uuid, byteArray);
         return NULL;
     }
