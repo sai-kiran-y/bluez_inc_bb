@@ -193,6 +193,17 @@ const char *on_local_char_read(const Application *application, const char *addre
         return NULL;
     }
 
+    if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, TCU_INFO_CHAR_UUID)) {
+        pthread_mutex_lock(&can_data_mutex);
+        GByteArray *byteArray = g_byte_array_new();
+        g_byte_array_append(byteArray, (const guint8 *)imei, strlen(imei));
+        pthread_mutex_unlock(&can_data_mutex);
+
+        log_debug(TAG, "Returning IMEI data for read request");
+        binc_application_set_char_value(application, service_uuid, char_uuid, byteArray);
+        return NULL;
+    }
+
     return BLUEZ_ERROR_REJECTED;
 }
 
@@ -447,6 +458,7 @@ void *can_write_thread(void *arg) {
     }
 }
 
+// Thread for reading IMEI data
 void *read_imei_thread(void *arg) {
     tty_fd = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_NDELAY);
     if (tty_fd == -1) {
@@ -475,8 +487,7 @@ void *read_imei_thread(void *arg) {
                 strncpy(imei, buffer, IMEI_LENGTH);  // IMEI is 15 digits
                 imei[IMEI_LENGTH] = '\0';
                 pthread_mutex_unlock(&can_data_mutex);
-                 log_info(TAG, "IMEI: %s", imei);
-
+                log_info(TAG, "IMEI: %s", imei);
             } else if (strstr(buffer, "ERROR")) {
                 log_error(TAG, "ERROR: Could not determine IMEI");
             }
@@ -487,6 +498,24 @@ void *read_imei_thread(void *arg) {
     close(tty_fd);
     tty_fd = -1;
     return NULL;
+}
+
+// Thread for writing IMEI data to characteristic
+void *imei_write_thread(void *arg) {
+    while (1) {
+        sleep(3);
+
+        if (is_authenticated) {
+            pthread_mutex_lock(&can_data_mutex);
+            GByteArray *byteArray = g_byte_array_new();
+            g_byte_array_append(byteArray, (const guint8 *)imei, strlen(imei));
+            pthread_mutex_unlock(&can_data_mutex);
+
+            log_debug(TAG, "Publishing IMEI to TCU_INFO characteristic");
+            binc_application_notify(app, VEHICLE_SERVICE_UUID, TCU_INFO_CHAR_UUID, byteArray);
+            g_byte_array_free(byteArray, TRUE);
+        }
+    }
 }
 
 int main(void) {
@@ -556,6 +585,10 @@ int main(void) {
         // Create IMEI read thread
         pthread_t imei_read_tid;
         pthread_create(&imei_read_tid, NULL, read_imei_thread, NULL);
+
+        // Create IMEI write thread
+        pthread_t imei_write_tid;
+        pthread_create(&imei_write_tid, NULL, imei_write_thread, NULL);
     } else {
         log_debug("MAIN", "No adapter found");
     }
