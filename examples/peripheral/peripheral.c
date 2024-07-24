@@ -24,6 +24,12 @@
 #include <glib.h>
 #include <stdio.h>
 #include <signal.h>
+#include <pthread.h>
+#include <linux/can.h>
+#include <linux/can/raw.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 #include "adapter.h"
 #include "device.h"
 #include "logger.h"
@@ -33,6 +39,7 @@
 #include "utility.h"
 #include "parser.h"
 #include <stdint.h>
+#include <unistd.h>
 
 #define TAG "Main"
 
@@ -63,6 +70,9 @@ Advertisement *advertisement = NULL;
 Application *app = NULL;
 static gboolean is_authenticated = FALSE;
 Device *connected_device = NULL;
+
+static pthread_mutex_t can_data_mutex = PTHREAD_MUTEX_INITIALIZER;
+static uint8_t can_data[6][8];  // Assuming 8 bytes per CAN ID
 
 void ble_install_vehicle_service()
 {
@@ -181,7 +191,7 @@ const char *on_local_char_write(const Application *application, const char *addr
         
         if (byteArray->len != DEFAULT_PASSWORD_LEN) {
             log_error(TAG, "Invalid password length: %d (expected %d)", byteArray->len, DEFAULT_PASSWORD_LEN);
-				binc_device_disconnect(connected_device);
+			binc_device_disconnect(connected_device);
             return BLUEZ_ERROR_INVALID_VALUE_LENGTH;
         }
 
@@ -211,8 +221,8 @@ const char *on_local_char_write(const Application *application, const char *addr
             //ble_install_vehicle_service();
         } else {
             log_error(TAG, "Authentication failed, received password: 0x%06x", received_password);
-				//disconnect the device
-				binc_device_disconnect(connected_device);
+			// Disconnect the device
+			binc_device_disconnect(connected_device);
             return BLUEZ_ERROR_AUTHORIZATION_FAILED;
         }
     }
@@ -257,6 +267,47 @@ static void cleanup_handler(int signo) {
     }
 }
 
+// Thread for reading CAN data
+void *can_read_thread(void *arg) {
+    int s;
+    struct sockaddr_can addr;
+    struct ifreq ifr;
+
+    if ((s = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
+        perror("Socket");
+        return NULL;
+    }
+
+    strcpy(ifr.ifr_name, "can0");
+    ioctl(s, SIOCGIFINDEX, &ifr);
+
+    addr.can_family = AF_CAN;
+    addr.can_ifindex = ifr.ifr_ifindex;
+
+    if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        perror("Bind");
+        close(s);
+        return NULL;
+    }
+
+    struct can_frame frame;
+    while (1) {
+        int nbytes = read(s, &frame, sizeof(struct can_frame));
+        if (nbytes < 0) {
+            perror("Read");
+            break;
+        }
+
+        if (frame.can_id <= 0x05) {
+            pthread_mutex_lock(&can_data_mutex);
+            memcpy(can_data[frame.can_id], frame.data, sizeof(frame.data));
+            pthread_mutex_unlock(&can_data_mutex);
+        }
+    }
+
+    close(s);
+    return NULL;
+}
 
 int main(void) {
 
@@ -310,6 +361,10 @@ int main(void) {
         binc_application_set_char_start_notify_cb(app, &on_local_char_start_notify);
         binc_application_set_char_stop_notify_cb(app, &on_local_char_stop_notify);
         binc_adapter_register_application(default_adapter, app);
+
+        // Create CAN read thread
+        pthread_t can_read_tid;
+        pthread_create(&can_read_tid, NULL, can_read_thread, NULL);
     } else {
         log_debug("MAIN", "No adapter found");
     }
@@ -326,5 +381,7 @@ int main(void) {
     // Disconnect from DBus
     g_dbus_connection_close_sync(dbusConnection, NULL, NULL);
     g_object_unref(dbusConnection);
+
     return 0;
 }
+
