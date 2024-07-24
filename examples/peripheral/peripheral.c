@@ -47,6 +47,9 @@
 #define TIMESTAMP_SIZE sizeof(struct timeval)
 #define CAN_DATA_LEN (NUM_CAN_IDS * (CAN_FRAME_SIZE + TIMESTAMP_SIZE + sizeof(canid_t)))
 
+// Customizable interval for writing CAN data to characteristic (in seconds)
+#define DEFAULT_WRITE_INTERVAL 5
+
 GMainLoop *loop = NULL;
 Adapter *default_adapter = NULL;
 Advertisement *advertisement = NULL;
@@ -61,6 +64,8 @@ static struct {
     struct timeval timestamp;
 } ble_can_id_arr[NUM_CAN_IDS];  // Array to store CAN frames and timestamps
 
+static int write_interval = DEFAULT_WRITE_INTERVAL;
+
 void ble_install_vehicle_service()
 {
     log_info(TAG, "Adding Vehicle Service\r\n");
@@ -71,7 +76,7 @@ void ble_install_vehicle_service()
             app,
             VEHICLE_SERVICE_UUID,
             CAN_CHAR_UUID,
-            GATT_CHR_PROP_NOTIFY);
+            GATT_CHR_PROP_READ | GATT_CHR_PROP_NOTIFY); // Support reading and notifying
     
     binc_application_add_characteristic(
             app,
@@ -152,7 +157,18 @@ const char *on_local_char_read(const Application *application, const char *addre
         GByteArray *byteArray = g_byte_array_new();
         log_debug(TAG, "calling g_byte_array_append");
         g_byte_array_append(byteArray, (const guint8 *)value, strlen(value));
-        log_debug(TAG, "calling gbinc_application_set_char_value");
+        log_debug(TAG, "calling binc_application_set_char_value");
+        binc_application_set_char_value(application, service_uuid, char_uuid, byteArray);
+        return NULL;
+    }
+
+    if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, CAN_CHAR_UUID)) {
+        pthread_mutex_lock(&can_data_mutex);
+        GByteArray *byteArray = g_byte_array_new();
+        g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
+        pthread_mutex_unlock(&can_data_mutex);
+
+        log_debug(TAG, "Returning CAN data for read request");
         binc_application_set_char_value(application, service_uuid, char_uuid, byteArray);
         return NULL;
     }
@@ -323,18 +339,18 @@ void *can_read_thread(void *arg) {
             pthread_mutex_unlock(&can_data_mutex);
 
             // Log CAN data buffer to stdout
-            log_info(TAG,"CAN Data Buffer: ");
+            log_debug(TAG, "CAN Data Buffer:");
             for (size_t i = 0; i < CAN_DATA_LEN; i++) {
-                log_info(TAG,"%02X ", can_data[i]);
+                log_debug(TAG, "%02X ", can_data[i]);
             }
 
             // Log each CAN frame with its timestamp
             for (int i = 0; i < NUM_CAN_IDS; i++) {
                 struct timeval *timestamp = &ble_can_id_arr[i].timestamp;
                 struct can_frame *frame = &ble_can_id_arr[i].frame;
-                log_info(TAG,"CAN ID: 0x%02X Timestamp: %ld.%06ld Data:", i, timestamp->tv_sec, timestamp->tv_usec);
+                log_debug(TAG, "CAN ID: 0x%02X Timestamp: %ld.%06ld Data:", i, timestamp->tv_sec, timestamp->tv_usec);
                 for (int j = 0; j < frame->can_dlc; j++) {
-                    log_info(TAG," 0x%02X", frame->data[j]);
+                    log_debug(TAG, " 0x%02X", frame->data[j]);
                 }
             }
         }
@@ -342,6 +358,22 @@ void *can_read_thread(void *arg) {
 
     close(s);
     return NULL;
+}
+
+// Thread for writing CAN data to characteristic
+void *can_write_thread(void *arg) {
+    while (1) {
+        sleep(write_interval);
+        
+        pthread_mutex_lock(&can_data_mutex);
+        GByteArray *byteArray = g_byte_array_new();
+        g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
+        pthread_mutex_unlock(&can_data_mutex);
+
+        log_debug(TAG, "Writing CAN data to characteristic");
+        binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
+        g_byte_array_free(byteArray, TRUE);
+    }
 }
 
 int main(void) {
@@ -403,6 +435,10 @@ int main(void) {
         // Create CAN read thread
         pthread_t can_read_tid;
         pthread_create(&can_read_tid, NULL, can_read_thread, NULL);
+
+        // Create CAN write thread
+        pthread_t can_write_tid;
+        pthread_create(&can_write_tid, NULL, can_write_thread, NULL);
     } else {
         log_debug("MAIN", "No adapter found");
     }
