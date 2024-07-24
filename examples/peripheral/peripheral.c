@@ -1,26 +1,3 @@
-/*
- *   Copyright (c) 2022 Martijn van Welie
- *
- *   Permission is hereby granted, free of charge, to any person obtaining a copy
- *   of this software and associated documentation files (the "Software"), to deal
- *   in the Software without restriction, including without limitation the rights
- *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *   copies of the Software, and to permit persons to whom the Software is
- *   furnished to do so, subject to the following conditions:
- *
- *   The above copyright notice and this permission notice shall be included in all
- *   copies or substantial portions of the Software.
- *
- *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *   SOFTWARE.
- *
- */
-
 #include <glib.h>
 #include <stdio.h>
 #include <signal.h>
@@ -30,6 +7,9 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <string.h>
 #include "adapter.h"
 #include "device.h"
 #include "logger.h"
@@ -38,8 +18,6 @@
 #include "advertisement.h"
 #include "utility.h"
 #include "parser.h"
-#include <stdint.h>
-#include <unistd.h>
 
 #define TAG "Main"
 
@@ -64,6 +42,11 @@
 
 #define BLUEZ_ERROR_AUTHORIZATION_FAILED "org.bluez.Error.Failed"
 
+#define NUM_CAN_IDS 6
+#define CAN_FRAME_SIZE sizeof(struct can_frame)
+#define TIMESTAMP_SIZE sizeof(struct timeval)
+#define CAN_DATA_LEN (NUM_CAN_IDS * (CAN_FRAME_SIZE + TIMESTAMP_SIZE + sizeof(canid_t)))
+
 GMainLoop *loop = NULL;
 Adapter *default_adapter = NULL;
 Advertisement *advertisement = NULL;
@@ -72,7 +55,11 @@ static gboolean is_authenticated = FALSE;
 Device *connected_device = NULL;
 
 static pthread_mutex_t can_data_mutex = PTHREAD_MUTEX_INITIALIZER;
-static uint8_t can_data[6][8];  // Assuming 8 bytes per CAN ID
+static uint8_t can_data[CAN_DATA_LEN];  // Buffer containing CAN ID, timestamp, and CAN data
+static struct {
+    struct can_frame frame;
+    struct timeval timestamp;
+} ble_can_id_arr[NUM_CAN_IDS];  // Array to store CAN frames and timestamps
 
 void ble_install_vehicle_service()
 {
@@ -115,13 +102,6 @@ void ble_install_vehicle_service()
             VEHICLE_SERVICE_UUID,
             UNLOCK_VEHICLE_CHAR_UUID,
             GATT_CHR_PROP_WRITE);
-
-    // binc_application_add_descriptor(
-    //         app,
-    //         VEHICLE_SERVICE_UUID,
-    //         TEMPERATURE_CHAR_UUID,
-    //         CUD_CHAR,
-    //         GATT_CHR_PROP_READ | GATT_CHR_PROP_WRITE);
 }
 
 void ble_install_auth_service()
@@ -151,7 +131,7 @@ void on_central_state_changed(Adapter *adapter, Device *device) {
     char *deviceToString = binc_device_to_string(device);
     log_debug(TAG, deviceToString);
     g_free(deviceToString);
-	 connected_device = device;
+    connected_device = device;
 
     log_debug(TAG, "remote central %s is %s", binc_device_get_address(device), binc_device_get_connection_state_name(device));
     ConnectionState state = binc_device_get_connection_state(device);
@@ -170,9 +150,9 @@ const char *on_local_char_read(const Application *application, const char *addre
     if (g_str_equal(service_uuid, AUTH_SERVICE_UUID) && g_str_equal(char_uuid, IS_AUTHENTICATED_CHAR_UUID)) {
         const char *value = is_authenticated ? "yes" : "no";
         GByteArray *byteArray = g_byte_array_new();
-    	log_debug(TAG, "calling g_byte_array_append");
+        log_debug(TAG, "calling g_byte_array_append");
         g_byte_array_append(byteArray, (const guint8 *)value, strlen(value));
-    	log_debug(TAG, "calling gbinc_application_set_char_value");
+        log_debug(TAG, "calling gbinc_application_set_char_value");
         binc_application_set_char_value(application, service_uuid, char_uuid, byteArray);
         return NULL;
     }
@@ -191,7 +171,7 @@ const char *on_local_char_write(const Application *application, const char *addr
         
         if (byteArray->len != DEFAULT_PASSWORD_LEN) {
             log_error(TAG, "Invalid password length: %d (expected %d)", byteArray->len, DEFAULT_PASSWORD_LEN);
-			binc_device_disconnect(connected_device);
+            binc_device_disconnect(connected_device);
             return BLUEZ_ERROR_INVALID_VALUE_LENGTH;
         }
 
@@ -221,15 +201,14 @@ const char *on_local_char_write(const Application *application, const char *addr
             //ble_install_vehicle_service();
         } else {
             log_error(TAG, "Authentication failed, received password: 0x%06x", received_password);
-			// Disconnect the device
-			binc_device_disconnect(connected_device);
+            // Disconnect the device
+            binc_device_disconnect(connected_device);
             return BLUEZ_ERROR_AUTHORIZATION_FAILED;
         }
     }
 
     return NULL;
 }
-
 
 void on_local_char_start_notify(const Application *application, const char *service_uuid, const char *char_uuid) {
     log_debug(TAG, "on start notify");
@@ -278,6 +257,10 @@ void *can_read_thread(void *arg) {
         return NULL;
     }
 
+    // Enable timestamping
+    int timestamp_on = 1;
+    setsockopt(s, SOL_SOCKET, SO_TIMESTAMP, &timestamp_on, sizeof(timestamp_on));
+
     strcpy(ifr.ifr_name, "can0");
     ioctl(s, SIOCGIFINDEX, &ifr);
 
@@ -291,22 +274,68 @@ void *can_read_thread(void *arg) {
     }
 
     struct can_frame frame;
+    struct msghdr msg;
+    struct iovec iov;
+    struct {
+        struct cmsghdr cm;
+        struct timeval tv;
+    } control;
+
+    char ctrlmsg[CMSG_SPACE(sizeof(struct timeval))];
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_name = &addr;
+    msg.msg_namelen = sizeof(addr);
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = &control;
+    msg.msg_controllen = sizeof(ctrlmsg);
+
     while (1) {
-        int nbytes = read(s, &frame, sizeof(struct can_frame));
+        iov.iov_base = &frame;
+        iov.iov_len = sizeof(struct can_frame);
+        int nbytes = recvmsg(s, &msg, 0);
         if (nbytes < 0) {
             perror("Read");
             break;
         }
 
+        struct timeval tv;
+        for (struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+            if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SO_TIMESTAMP) {
+                memcpy(&tv, CMSG_DATA(cmsg), sizeof(tv));
+            }
+        }
+
         if (frame.can_id <= 0x05) {
             pthread_mutex_lock(&can_data_mutex);
-            memcpy(can_data[frame.can_id], frame.data, sizeof(frame.data));
-            pthread_mutex_unlock(&can_data_mutex);
+            ble_can_id_arr[frame.can_id].frame = frame;
+            ble_can_id_arr[frame.can_id].timestamp = tv;
             
-            // Log CAN data to stdout
-            log_info(TAG, "CAN ID: 0x%02X Data:", frame.can_id);
-            for (int i = 0; i < frame.can_dlc; i++) {
-                log_info(TAG, " 0x%02X", frame.data[i]);
+            // Update the global can_data buffer
+            memset(can_data, 0, CAN_DATA_LEN);  // Clear buffer
+            for (int i = 0; i < NUM_CAN_IDS; i++) {
+                uint8_t *data_ptr = can_data + i * (sizeof(canid_t) + CAN_FRAME_SIZE + TIMESTAMP_SIZE);
+                canid_t can_id = i;
+                memcpy(data_ptr, &can_id, sizeof(canid_t));  // Copy CAN ID
+                memcpy(data_ptr + sizeof(canid_t), &ble_can_id_arr[i].timestamp, TIMESTAMP_SIZE);  // Copy timestamp
+                memcpy(data_ptr + sizeof(canid_t) + TIMESTAMP_SIZE, &ble_can_id_arr[i].frame, CAN_FRAME_SIZE);  // Copy CAN frame
+            }
+            pthread_mutex_unlock(&can_data_mutex);
+
+            // Log CAN data buffer to stdout
+            log_info(TAG,"CAN Data Buffer: ");
+            for (size_t i = 0; i < CAN_DATA_LEN; i++) {
+                log_info(TAG,"%02X ", can_data[i]);
+            }
+
+            // Log each CAN frame with its timestamp
+            for (int i = 0; i < NUM_CAN_IDS; i++) {
+                struct timeval *timestamp = &ble_can_id_arr[i].timestamp;
+                struct can_frame *frame = &ble_can_id_arr[i].frame;
+                log_info(TAG,"CAN ID: 0x%02X Timestamp: %ld.%06ld Data:", i, timestamp->tv_sec, timestamp->tv_usec);
+                for (int j = 0; j < frame->can_dlc; j++) {
+                    log_info(TAG," 0x%02X", frame->data[j]);
+                }
             }
         }
     }
@@ -318,6 +347,9 @@ void *can_read_thread(void *arg) {
 int main(void) {
 
     log_set_level(LOG_DEBUG);
+
+    // Initialize can_data buffer
+    memset(can_data, 0, CAN_DATA_LEN);
 
     // Get a DBus connection
     GDBusConnection *dbusConnection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
