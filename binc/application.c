@@ -745,7 +745,8 @@ static int binc_characteristic_set_value(const Application *application, LocalCh
 	
     if (characteristic->value != NULL) {
 	 	log_debug(TAG,"freeing characteristic->value=%d", characteristic->value);
-        g_byte_array_free(characteristic->value, TRUE);
+        //g_byte_array_free(characteristic->value, TRUE);
+        g_byte_array_unref(characteristic->value);
     }
     log_debug(TAG, "freed characteristic->value");
     characteristic->value = byteArray;
