@@ -302,6 +302,12 @@ void *can_read_thread(void *arg) {
             pthread_mutex_lock(&can_data_mutex);
             memcpy(can_data[frame.can_id], frame.data, sizeof(frame.data));
             pthread_mutex_unlock(&can_data_mutex);
+            
+            // Log CAN data to stdout
+            log_info(TAG, "CAN ID: 0x%02X Data:", frame.can_id);
+            for (int i = 0; i < frame.can_dlc; i++) {
+                log_info(TAG, " 0x%02X", frame.data[i]);
+            }
         }
     }
 
