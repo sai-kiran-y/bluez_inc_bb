@@ -225,9 +225,15 @@ const char *on_local_char_write(const Application *application, const char *addr
     }
 
     if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, UNLOCK_VEHICLE_CHAR_UUID)) {
-        log_info(TAG, "Vehicle unlock command received");
-        log_info(TAG, "Data: %s", byteArray->data);
-        // Here you can log or handle the vehicle unlock command
+        if (is_authenticated) {
+            if (byteArray->len == 1 && byteArray->data[0] == 0x01) {
+                log_info(TAG, "Vehicle unlock command received");
+            } else {
+                log_info(TAG, "Invalid command");
+            }
+        } else {
+            log_info(TAG, "Cannot unlock vehicle, authentication is not complete");
+        }
     }
 
     return NULL;
