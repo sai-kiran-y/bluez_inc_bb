@@ -172,11 +172,6 @@ const char *on_local_char_read(const Application *application, const char *addre
 
     log_debug(TAG, "on char read");
 
-    if (!is_authenticated) {
-        log_info(TAG, "Read request rejected, device is not authenticated");
-        return BLUEZ_ERROR_AUTHORIZATION_FAILED;
-    }
-
     if (g_str_equal(service_uuid, AUTH_SERVICE_UUID) && g_str_equal(char_uuid, IS_AUTHENTICATED_CHAR_UUID)) {
         const char *value = is_authenticated ? "yes" : "no";
         GByteArray *byteArray = g_byte_array_new();
@@ -185,6 +180,11 @@ const char *on_local_char_read(const Application *application, const char *addre
         log_debug(TAG, "calling binc_application_set_char_value");
         binc_application_set_char_value(application, service_uuid, char_uuid, byteArray);
         return NULL;
+    }
+
+    if (!is_authenticated) {
+        log_info(TAG, "Read request rejected: Authentication required");
+        return BLUEZ_ERROR_AUTHORIZATION_FAILED;
     }
 
     if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, CAN_CHAR_UUID)) {
@@ -216,11 +216,6 @@ const char *on_local_char_write(const Application *application, const char *addr
                                 const char *char_uuid, GByteArray *byteArray) {
 
     log_debug(TAG, "on char write");
-
-    if (!is_authenticated && !(g_str_equal(service_uuid, AUTH_SERVICE_UUID) && g_str_equal(char_uuid, PASSWORD_CHAR_UUID))) {
-        log_info(TAG, "Write request rejected, device is not authenticated");
-        return BLUEZ_ERROR_AUTHORIZATION_FAILED;
-    }
 
     if (g_str_equal(service_uuid, AUTH_SERVICE_UUID) && g_str_equal(char_uuid, PASSWORD_CHAR_UUID)) {
         log_debug(TAG, "Password write received, length: %d", byteArray->len);
@@ -261,6 +256,11 @@ const char *on_local_char_write(const Application *application, const char *addr
             binc_device_disconnect(connected_device);
             return BLUEZ_ERROR_AUTHORIZATION_FAILED;
         }
+    }
+
+    if (!is_authenticated) {
+        log_info(TAG, "Write request rejected: Authentication required");
+        return BLUEZ_ERROR_AUTHORIZATION_FAILED;
     }
 
     if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, CAN_FREQ_CHAR_UUID)) {
@@ -341,7 +341,6 @@ static void cleanup_handler(int signo) {
         g_main_loop_quit(loop);
     }
 }
-
 
 // Thread for reading CAN data
 void *can_read_thread(void *arg) {
