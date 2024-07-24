@@ -48,7 +48,7 @@
 #define CAN_DATA_LEN (NUM_CAN_IDS * (CAN_FRAME_SIZE + TIMESTAMP_SIZE + sizeof(canid_t)))
 
 // Customizable interval for writing CAN data to characteristic (in seconds)
-#define DEFAULT_WRITE_INTERVAL 5
+#define DEFAULT_WRITE_INTERVAL 1
 
 GMainLoop *loop = NULL;
 Adapter *default_adapter = NULL;
@@ -78,6 +78,8 @@ void ble_install_vehicle_service()
             CAN_CHAR_UUID,
             GATT_CHR_PROP_READ | GATT_CHR_PROP_NOTIFY); // Support reading and notifying
     
+    // Skip GPS for now
+    /*
     binc_application_add_characteristic(
             app,
             VEHICLE_SERVICE_UUID,
@@ -89,7 +91,7 @@ void ble_install_vehicle_service()
             VEHICLE_SERVICE_UUID,
             GPS_FREQ_CHAR_UUID,
             GATT_CHR_PROP_WRITE);
-    
+    */
     binc_application_add_characteristic(
             app,
             VEHICLE_SERVICE_UUID,
@@ -176,7 +178,6 @@ const char *on_local_char_read(const Application *application, const char *addre
     return BLUEZ_ERROR_REJECTED;
 }
 
-
 const char *on_local_char_write(const Application *application, const char *address, const char *service_uuid,
                                 const char *char_uuid, GByteArray *byteArray) {
 
@@ -221,6 +222,12 @@ const char *on_local_char_write(const Application *application, const char *addr
             binc_device_disconnect(connected_device);
             return BLUEZ_ERROR_AUTHORIZATION_FAILED;
         }
+    }
+
+    if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, UNLOCK_VEHICLE_CHAR_UUID)) {
+        log_info(TAG, "Vehicle unlock command received");
+        log_info(TAG, "Data: %s", byteArray->data);
+        // Here you can log or handle the vehicle unlock command
     }
 
     return NULL;
@@ -326,33 +333,34 @@ void *can_read_thread(void *arg) {
             pthread_mutex_lock(&can_data_mutex);
             ble_can_id_arr[frame.can_id].frame = frame;
             ble_can_id_arr[frame.can_id].timestamp = tv;
-            
-            // Update the global can_data buffer
-            memset(can_data, 0, CAN_DATA_LEN);  // Clear buffer
-            for (int i = 0; i < NUM_CAN_IDS; i++) {
-                uint8_t *data_ptr = can_data + i * (sizeof(canid_t) + CAN_FRAME_SIZE + TIMESTAMP_SIZE);
-                canid_t can_id = i;
-                memcpy(data_ptr, &can_id, sizeof(canid_t));  // Copy CAN ID
-                memcpy(data_ptr + sizeof(canid_t), &ble_can_id_arr[i].timestamp, TIMESTAMP_SIZE);  // Copy timestamp
-                memcpy(data_ptr + sizeof(canid_t) + TIMESTAMP_SIZE, &ble_can_id_arr[i].frame, CAN_FRAME_SIZE);  // Copy CAN frame
-            }
-            pthread_mutex_unlock(&can_data_mutex);
 
-            // Log CAN data buffer to stdout
-            log_debug(TAG, "CAN Data Buffer:");
-            for (size_t i = 0; i < CAN_DATA_LEN; i++) {
-                log_debug(TAG, "%02X ", can_data[i]);
-            }
+            if (is_authenticated) {
+                // Update the global can_data buffer
+                memset(can_data, 0, CAN_DATA_LEN);  // Clear buffer
+                for (int i = 0; i < NUM_CAN_IDS; i++) {
+                    uint8_t *data_ptr = can_data + i * (sizeof(canid_t) + CAN_FRAME_SIZE + TIMESTAMP_SIZE);
+                    canid_t can_id = i;
+                    memcpy(data_ptr, &can_id, sizeof(canid_t));  // Copy CAN ID
+                    memcpy(data_ptr + sizeof(canid_t), &ble_can_id_arr[i].timestamp, TIMESTAMP_SIZE);  // Copy timestamp
+                    memcpy(data_ptr + sizeof(canid_t) + TIMESTAMP_SIZE, &ble_can_id_arr[i].frame, CAN_FRAME_SIZE);  // Copy CAN frame
+                }
 
-            // Log each CAN frame with its timestamp
-            for (int i = 0; i < NUM_CAN_IDS; i++) {
-                struct timeval *timestamp = &ble_can_id_arr[i].timestamp;
-                struct can_frame *frame = &ble_can_id_arr[i].frame;
-                log_debug(TAG, "CAN ID: 0x%02X Timestamp: %ld.%06ld Data:", i, timestamp->tv_sec, timestamp->tv_usec);
-                for (int j = 0; j < frame->can_dlc; j++) {
-                    log_debug(TAG, " 0x%02X", frame->data[j]);
+                log_debug(TAG, "Updated CAN Data Buffer:");
+                for (size_t i = 0; i < CAN_DATA_LEN; i++) {
+                    log_debug(TAG, "%02X ", can_data[i]);
+                }
+
+                // Log each CAN frame with its timestamp
+                for (int i = 0; i < NUM_CAN_IDS; i++) {
+                    struct timeval *timestamp = &ble_can_id_arr[i].timestamp;
+                    struct can_frame *frame = &ble_can_id_arr[i].frame;
+                    log_debug(TAG, "CAN ID: 0x%02X Timestamp: %ld.%06ld Data:", i, timestamp->tv_sec, timestamp->tv_usec);
+                    for (int j = 0; j < frame->can_dlc; j++) {
+                        log_debug(TAG, " 0x%02X", frame->data[j]);
+                    }
                 }
             }
+            pthread_mutex_unlock(&can_data_mutex);
         }
     }
 
@@ -365,14 +373,16 @@ void *can_write_thread(void *arg) {
     while (1) {
         sleep(write_interval);
         
-        pthread_mutex_lock(&can_data_mutex);
-        GByteArray *byteArray = g_byte_array_new();
-        g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
-        pthread_mutex_unlock(&can_data_mutex);
+        if (is_authenticated) {
+            pthread_mutex_lock(&can_data_mutex);
+            GByteArray *byteArray = g_byte_array_new();
+            g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
+            pthread_mutex_unlock(&can_data_mutex);
 
-        log_debug(TAG, "Writing CAN data to characteristic");
-        binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
-        g_byte_array_free(byteArray, TRUE);
+            log_debug(TAG, "Writing CAN data to characteristic");
+            binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
+            g_byte_array_free(byteArray, TRUE);
+        }
     }
 }
 
