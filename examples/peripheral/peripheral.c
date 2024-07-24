@@ -172,6 +172,11 @@ const char *on_local_char_read(const Application *application, const char *addre
 
     log_debug(TAG, "on char read");
 
+    if (!is_authenticated) {
+        log_info(TAG, "Read request rejected, device is not authenticated");
+        return BLUEZ_ERROR_AUTHORIZATION_FAILED;
+    }
+
     if (g_str_equal(service_uuid, AUTH_SERVICE_UUID) && g_str_equal(char_uuid, IS_AUTHENTICATED_CHAR_UUID)) {
         const char *value = is_authenticated ? "yes" : "no";
         GByteArray *byteArray = g_byte_array_new();
@@ -211,6 +216,11 @@ const char *on_local_char_write(const Application *application, const char *addr
                                 const char *char_uuid, GByteArray *byteArray) {
 
     log_debug(TAG, "on char write");
+
+    if (!is_authenticated && !(g_str_equal(service_uuid, AUTH_SERVICE_UUID) && g_str_equal(char_uuid, PASSWORD_CHAR_UUID))) {
+        log_info(TAG, "Write request rejected, device is not authenticated");
+        return BLUEZ_ERROR_AUTHORIZATION_FAILED;
+    }
 
     if (g_str_equal(service_uuid, AUTH_SERVICE_UUID) && g_str_equal(char_uuid, PASSWORD_CHAR_UUID)) {
         log_debug(TAG, "Password write received, length: %d", byteArray->len);
@@ -254,28 +264,20 @@ const char *on_local_char_write(const Application *application, const char *addr
     }
 
     if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, CAN_FREQ_CHAR_UUID)) {
-        if (is_authenticated) {
-            if (byteArray->len == 1) {
-                uint8_t received_interval = byteArray->data[0];
-                log_info(TAG, "Received CAN frequency: %u seconds", received_interval);
-                write_interval = received_interval;
-            } else {
-                log_error(TAG, "Invalid CAN frequency length: %d", byteArray->len);
-            }
+        if (byteArray->len == 1) {
+            uint8_t received_interval = byteArray->data[0];
+            log_info(TAG, "Received CAN frequency: %u seconds", received_interval);
+            write_interval = received_interval;
         } else {
-            log_info(TAG, "Authenticate first to set CAN frequency");
+            log_error(TAG, "Invalid CAN frequency length: %d", byteArray->len);
         }
     }
 
     if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, UNLOCK_VEHICLE_CHAR_UUID)) {
-        if (is_authenticated) {
-            if (byteArray->len == 1 && byteArray->data[0] == 0x01) {
-                log_info(TAG, "Vehicle unlock command received");
-            } else {
-                log_info(TAG, "Invalid command");
-            }
+        if (byteArray->len == 1 && byteArray->data[0] == 0x01) {
+            log_info(TAG, "Vehicle unlock command received");
         } else {
-            log_info(TAG, "Received vehicle unlock command, but authentication is not complete");
+            log_info(TAG, "Invalid command");
         }
     }
 
@@ -458,7 +460,6 @@ void *can_write_thread(void *arg) {
     }
 }
 
-// Thread for reading IMEI data
 void *read_imei_thread(void *arg) {
     tty_fd = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY | O_NDELAY);
     if (tty_fd == -1) {
@@ -498,24 +499,6 @@ void *read_imei_thread(void *arg) {
     close(tty_fd);
     tty_fd = -1;
     return NULL;
-}
-
-// Thread for writing IMEI data to characteristic
-void *imei_write_thread(void *arg) {
-    while (1) {
-        sleep(3);
-
-        if (is_authenticated) {
-            pthread_mutex_lock(&can_data_mutex);
-            GByteArray *byteArray = g_byte_array_new();
-            g_byte_array_append(byteArray, (const guint8 *)imei, strlen(imei));
-            pthread_mutex_unlock(&can_data_mutex);
-
-            log_debug(TAG, "Publishing IMEI to TCU_INFO characteristic");
-            binc_application_notify(app, VEHICLE_SERVICE_UUID, TCU_INFO_CHAR_UUID, byteArray);
-            g_byte_array_free(byteArray, TRUE);
-        }
-    }
 }
 
 int main(void) {
@@ -585,10 +568,6 @@ int main(void) {
         // Create IMEI read thread
         pthread_t imei_read_tid;
         pthread_create(&imei_read_tid, NULL, read_imei_thread, NULL);
-
-        // Create IMEI write thread
-        pthread_t imei_write_tid;
-        pthread_create(&imei_write_tid, NULL, imei_write_thread, NULL);
     } else {
         log_debug("MAIN", "No adapter found");
     }
