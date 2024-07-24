@@ -475,6 +475,8 @@ void *read_imei_thread(void *arg) {
                 strncpy(imei, buffer, IMEI_LENGTH);  // IMEI is 15 digits
                 imei[IMEI_LENGTH] = '\0';
                 pthread_mutex_unlock(&can_data_mutex);
+                 log_info(TAG, "IMEI: %s", imei);
+
             } else if (strstr(buffer, "ERROR")) {
                 log_error(TAG, "ERROR: Could not determine IMEI");
             }
