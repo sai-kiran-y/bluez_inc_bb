@@ -224,6 +224,35 @@ const char *on_local_char_write(const Application *application, const char *addr
         }
     }
 
+	if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, CAN_FREQ_CHAR_UUID)) {
+    	if (is_authenticated) {
+        	if (byteArray->len == 1) {
+            	uint8_t received_interval = byteArray->data[0];
+            	log_info(TAG, "Received CAN frequency: %u seconds", received_interval);
+            	write_interval = received_interval;
+        	} else {
+            	log_error(TAG, "Invalid CAN frequency length: %d", byteArray->len);
+        	}
+    	} else {
+        	log_info(TAG, "Authenticate first to set CAN frequency");
+    	}
+	}
+
+/*
+    if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, CAN_FREQ_CHAR_UUID)) {
+        if (is_authenticated) {
+            if (byteArray->len == 4) {
+                uint32_t received_interval = (byteArray->data[0] << 24) | (byteArray->data[1] << 16) | (byteArray->data[2] << 8) | byteArray->data[3];
+                log_info(TAG, "Received CAN frequency: %u", received_interval);
+                write_interval = received_interval;
+            } else {
+                log_error(TAG, "Invalid CAN frequency length");
+            }
+        } else {
+            log_info(TAG, "Authenticate first to set CAN frequency");
+        }
+    }
+*/
     if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, UNLOCK_VEHICLE_CHAR_UUID)) {
         if (is_authenticated) {
             if (byteArray->len == 1 && byteArray->data[0] == 0x01) {
@@ -232,7 +261,7 @@ const char *on_local_char_write(const Application *application, const char *addr
                 log_info(TAG, "Invalid command");
             }
         } else {
-            log_info(TAG, "Cannot unlock vehicle, authentication is not complete");
+            log_info(TAG, "Received vehicle unlock command, but authentication is not complete");
         }
     }
 
