@@ -980,6 +980,7 @@ static void binc_internal_start_advertising_cb(__attribute__((unused)) GObject *
     g_assert(adapter != NULL);
 
     GError *error = NULL;
+	sleep(1);
     GVariant *value = g_dbus_connection_call_finish(adapter->connection, res, &error);
     if (value != NULL) {
         g_variant_unref(value);
@@ -1060,7 +1061,9 @@ static void binc_internal_register_appl_cb(__attribute__((unused)) GObject *sour
     g_assert(adapter != NULL);
 
     GError *error = NULL;
+	sleep(1);
     GVariant *value = g_dbus_connection_call_finish(adapter->connection, res, &error);
+	sleep(1);
     if (value != NULL) {
         g_variant_unref(value);
     }
