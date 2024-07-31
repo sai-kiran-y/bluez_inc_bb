@@ -52,13 +52,14 @@
 #define CAN_DATA_LEN (NUM_CAN_IDS * (CAN_FRAME_SIZE + TIMESTAMP_SIZE + sizeof(canid_t)))
 
 // Customizable interval for writing CAN data to characteristic (in seconds)
-#define DEFAULT_WRITE_INTERVAL 1
+#define DEFAULT_WRITE_INTERVAL 100
 
 #define AT_COMMAND "AT+GSN\r"
 #define DEVICE_PORT "/dev/ttyUSB0"
 #define BUFFER_SIZE 256
 
 #define IMEI_LENGTH 15
+#define TO_MILLIS 0.001
 
 char imei[IMEI_LENGTH + 1] = {0};
 int tty_fd = -1;
@@ -76,7 +77,7 @@ static struct {
     struct timeval timestamp;
 } ble_can_id_arr[NUM_CAN_IDS];  // Array to store CAN frames and timestamps
 
-static int write_interval = DEFAULT_WRITE_INTERVAL;
+static int write_interval = (DEFAULT_WRITE_INTERVAL) * (TO_MILLIS);
 
 void ble_install_vehicle_service()
 {
@@ -267,7 +268,7 @@ const char *on_local_char_write(const Application *application, const char *addr
         if (byteArray->len == 1) {
             uint8_t received_interval = byteArray->data[0];
             log_info(TAG, "Received CAN frequency: %u seconds", received_interval);
-            write_interval = received_interval;
+            write_interval = received_interval * TO_MILLIS;
         } else {
             log_error(TAG, "Invalid CAN frequency length: %d", byteArray->len);
         }
