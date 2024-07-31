@@ -174,7 +174,7 @@ const char *on_local_char_read(const Application *application, const char *addre
     log_debug(TAG, "on char read");
 
     if (g_str_equal(service_uuid, AUTH_SERVICE_UUID) && g_str_equal(char_uuid, IS_AUTHENTICATED_CHAR_UUID)) {
-        const char *value = is_authenticated ? "yes" : "no";
+        const char *value = is_authenticated ? "true" : "false";
         GByteArray *byteArray = g_byte_array_new();
         log_debug(TAG, "calling g_byte_array_append");
         g_byte_array_append(byteArray, (const guint8 *)value, strlen(value));
