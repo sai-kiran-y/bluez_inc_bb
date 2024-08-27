@@ -606,7 +606,7 @@ int main(void) {
         g_ptr_array_add(adv_service_uuids, AUTH_SERVICE_UUID);
 
         advertisement = binc_advertisement_create();
-        binc_advertisement_set_local_name(advertisement, "iWave-BLE");
+        binc_advertisement_set_local_name(advertisement, "LxG_iWave_1");
         binc_advertisement_set_services(advertisement, adv_service_uuids);
         g_ptr_array_free(adv_service_uuids, TRUE);
         binc_adapter_start_advertising(default_adapter, advertisement);
