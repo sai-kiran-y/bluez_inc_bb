@@ -159,6 +159,21 @@ void on_powered_state_changed(Adapter *adapter, gboolean state) {
     log_debug(TAG, "powered '%s' (%s)", state ? "on" : "off", binc_adapter_get_path(adapter));
 }
 
+void publish_is_authenticated() {
+    const char *value = is_authenticated ? "true" : "false";
+    GByteArray *byteArray = g_byte_array_new();
+    g_byte_array_append(byteArray, (const guint8 *)value, strlen(value));
+    binc_application_set_char_value(app, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, byteArray);
+    g_byte_array_free(byteArray, TRUE);
+}
+
+// Timer callback to publish is_authenticated every second
+gboolean publish_is_authenticated_periodically(gpointer user_data) {
+    publish_is_authenticated();
+    return TRUE; // Returning TRUE ensures the function is called repeatedly
+}
+
+
 void on_central_state_changed(Adapter *adapter, Device *device) {
     char *deviceToString = binc_device_to_string(device);
     log_debug(TAG, deviceToString);
@@ -169,6 +184,7 @@ void on_central_state_changed(Adapter *adapter, Device *device) {
     ConnectionState state = binc_device_get_connection_state(device);
     if (state == BINC_CONNECTED) {
         binc_adapter_stop_advertising(adapter, advertisement);
+		is_authenticated = FALSE;
     } else if (state == BINC_DISCONNECTED){
         binc_adapter_start_advertising(adapter, advertisement);
     }
@@ -246,12 +262,12 @@ const char *on_local_char_write(const Application *application, const char *addr
         if (received_password == DEFAULT_PASSWORD) {
             is_authenticated = TRUE;
 
-            // Write "yes" to IS_AUTHENTICATED_CHAR_UUID
-            const uint8_t yes_value[] = {'y', 'e', 's'};
-            GByteArray *yesArray = g_byte_array_new();
-            g_byte_array_append(yesArray, yes_value, sizeof(yes_value));
-            binc_application_set_char_value(application, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, yesArray);
-            g_byte_array_free(yesArray, TRUE);
+            // Write "true" to IS_AUTHENTICATED_CHAR_UUID
+            //const uint8_t yes_value[] = {'t', 'r', 'u', 'e'};
+            //GByteArray *yesArray = g_byte_array_new();
+            //g_byte_array_append(yesArray, yes_value, sizeof(yes_value));
+            //binc_application_set_char_value(application, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, yesArray);
+            //g_byte_array_free(yesArray, TRUE);
 
             log_info(TAG, "Authentication successful, 'yes' written to IS_AUTHENTICATED_CHAR_UUID");
 
@@ -260,6 +276,7 @@ const char *on_local_char_write(const Application *application, const char *addr
         } else {
             log_error(TAG, "Authentication failed, received password: 0x%06x", received_password);
             // Disconnect the device
+            is_authenticated = FALSE;
             binc_device_disconnect(connected_device);
             return BLUEZ_ERROR_AUTHORIZATION_FAILED;
         }
@@ -593,6 +610,9 @@ int main(void) {
 
     // Bail out after some time
     g_timeout_add_seconds(600, callback, loop);
+
+	// Start the timer to publish is_authenticated every 1 second
+	g_timeout_add_seconds(1, publish_is_authenticated_periodically, NULL);
 
     // Start the mainloop
     g_main_loop_run(loop);
