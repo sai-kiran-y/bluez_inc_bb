@@ -46,7 +46,7 @@
 
 #define BLUEZ_ERROR_AUTHORIZATION_FAILED "org.bluez.Error.Failed"
 
-#define NUM_CAN_IDS 6
+#define NUM_CAN_IDS 11
 #define CAN_FRAME_SIZE sizeof(struct can_frame)
 #define TIMESTAMP_SIZE sizeof(struct timeval)
 #define CAN_DATA_LEN (NUM_CAN_IDS * (CAN_FRAME_SIZE + TIMESTAMP_SIZE + sizeof(canid_t)))
@@ -61,6 +61,8 @@
 #define IMEI_LENGTH 15
 #define TO_MILLIS 0.001
 
+
+
 char imei[IMEI_LENGTH + 1] = {0};
 int tty_fd = -1;
 GMainLoop *loop = NULL;
@@ -69,6 +71,10 @@ Advertisement *advertisement = NULL;
 Application *app = NULL;
 static gboolean is_authenticated = FALSE;
 Device *connected_device = NULL;
+const canid_t monitored_can_ids[NUM_CAN_IDS] = {
+    0x407, 0x520, 0x201, 0x306, 0x303, 0x305, 0x302, 0x322, 0x307, 0x100, 0x500
+};
+
 
 static pthread_mutex_t can_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint8_t can_data[CAN_DATA_LEN];  // Buffer containing CAN ID, timestamp, and CAN data
@@ -403,17 +409,30 @@ void *can_read_thread(void *arg) {
             }
         }
 
-        if (frame.can_id <= 0x05) {
+		gboolean is_monitored = FALSE;
+		for (int i = 0; i < NUM_CAN_IDS; i++) {
+    		if (frame.can_id == monitored_can_ids[i]) {
+        		is_monitored = TRUE;
+        		break;
+    		}
+		}
+
+		if (is_monitored) {
             pthread_mutex_lock(&can_data_mutex);
-            ble_can_id_arr[frame.can_id].frame = frame;
-            ble_can_id_arr[frame.can_id].timestamp = tv;
+			for (int i = 0; i < NUM_CAN_IDS; i++) {
+    			if (frame.can_id == monitored_can_ids[i]) {
+        			ble_can_id_arr[i].frame = frame;
+        			ble_can_id_arr[i].timestamp = tv;
+        			break;
+    			}
+			}
 
             if (is_authenticated) {
                 // Update the global can_data buffer
                 memset(can_data, 0, CAN_DATA_LEN);  // Clear buffer
                 for (int i = 0; i < NUM_CAN_IDS; i++) {
-                    uint8_t *data_ptr = can_data + i * (sizeof(canid_t) + CAN_FRAME_SIZE + TIMESTAMP_SIZE);
-                    canid_t can_id = i;
+					uint8_t *data_ptr = can_data + i * (sizeof(canid_t) + CAN_FRAME_SIZE + TIMESTAMP_SIZE);
+					canid_t can_id = monitored_can_ids[i];
                     memcpy(data_ptr, &can_id, sizeof(canid_t));  // Copy CAN ID
                     memcpy(data_ptr + sizeof(canid_t), &ble_can_id_arr[i].timestamp, TIMESTAMP_SIZE);  // Copy timestamp
                     memcpy(data_ptr + sizeof(canid_t) + TIMESTAMP_SIZE, &ble_can_id_arr[i].frame, CAN_FRAME_SIZE);  // Copy CAN frame
