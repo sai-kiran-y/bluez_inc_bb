@@ -74,6 +74,8 @@ Device *connected_device = NULL;
 const canid_t monitored_can_ids[NUM_CAN_IDS] = {
     0x407, 0x520, 0x201, 0x306, 0x303, 0x305, 0x302, 0x322, 0x307, 0x100, 0x500
 };
+const char *device_id_global = "1"; // For now, device_id is assumed to be 1
+
 
 
 static pthread_mutex_t can_data_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -133,7 +135,7 @@ void ble_install_vehicle_service()
             app,
             VEHICLE_SERVICE_UUID,
             TCU_INFO_CHAR_UUID,
-            GATT_CHR_PROP_READ);
+            GATT_CHR_PROP_READ | GATT_CHR_PROP_NOTIFY );
 }
 
 void ble_install_auth_service()
@@ -172,6 +174,29 @@ gboolean publish_is_authenticated_periodically(gpointer user_data) {
     publish_is_authenticated();
     return TRUE; // Returning TRUE ensures the function is called repeatedly
 }
+
+void publish_tcu_info() {
+    // Format the TCU info as IMEI,DeviceID
+    char tcu_info[IMEI_LENGTH + 2 + strlen(device_id_global)]; // IMEI + comma + DeviceID
+    snprintf(tcu_info, sizeof(tcu_info), "%s,%s", imei, device_id_global);
+
+    // Convert the tcu_info to a byte array for publication
+    GByteArray *byteArray = g_byte_array_new();
+    g_byte_array_append(byteArray, (const guint8 *)tcu_info, strlen(tcu_info));
+
+    // Publish the value to the characteristic
+    binc_application_notify(app, VEHICLE_SERVICE_UUID, TCU_INFO_CHAR_UUID, byteArray);
+
+    log_debug(TAG, "Published TCU info: %s", tcu_info);
+
+    g_byte_array_free(byteArray, TRUE);
+}
+
+gboolean publish_tcu_info_periodically(gpointer user_data) {
+    publish_tcu_info();
+    return TRUE; // Returning TRUE ensures the function is called repeatedly
+}
+
 
 
 void on_central_state_changed(Adapter *adapter, Device *device) {
@@ -220,17 +245,23 @@ const char *on_local_char_read(const Application *application, const char *addre
         binc_application_set_char_value(application, service_uuid, char_uuid, byteArray);
         return NULL;
     }
-
+	/*
     if (g_str_equal(service_uuid, VEHICLE_SERVICE_UUID) && g_str_equal(char_uuid, TCU_INFO_CHAR_UUID)) {
         pthread_mutex_lock(&can_data_mutex);
+		char tcu_info[IMEI_LENGTH + 2 + strlen(device_id_global)]; // IMEI + comma + DeviceID
+	    snprintf(tcu_info, sizeof(tcu_info), "%s,%s", imei, device_id_global);
+
+
         GByteArray *byteArray = g_byte_array_new();
-        g_byte_array_append(byteArray, (const guint8 *)imei, strlen(imei));
+        g_byte_array_append(byteArray, (const guint8 *)tcu_info, strlen(tcu_info));
         pthread_mutex_unlock(&can_data_mutex);
 
-        log_debug(TAG, "Returning IMEI data for read request");
+	    log_debug(TAG, "Returning TCU info: %s", tcu_info);
         binc_application_set_char_value(application, service_uuid, char_uuid, byteArray);
+	    g_byte_array_free(byteArray, TRUE);
         return NULL;
     }
+	*/
 
     return BLUEZ_ERROR_REJECTED;
 }
@@ -613,6 +644,10 @@ int main(void) {
 
 	// Start the timer to publish is_authenticated every 1 second
 	g_timeout_add_seconds(1, publish_is_authenticated_periodically, NULL);
+	
+	// Start the timer to publish tcu_info every 1 second
+	g_timeout_add_seconds(1, publish_tcu_info_periodically, NULL);
+
 
     // Start the mainloop
     g_main_loop_run(loop);
