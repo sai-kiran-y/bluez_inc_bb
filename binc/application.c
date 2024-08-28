@@ -746,10 +746,12 @@ static int binc_characteristic_set_value(const Application *application, LocalCh
     if (characteristic->value != NULL) {
 	 	log_debug(TAG,"freeing characteristic->value=%d", characteristic->value);
         //g_byte_array_free(characteristic->value, TRUE);
+	        // Decrease the reference count properly to avoid reference count issues
         g_byte_array_unref(characteristic->value);
+        characteristic->value = NULL;  // Clear the pointer to avoid double unref
     }
     log_debug(TAG, "freed characteristic->value");
-    characteristic->value = byteArray;
+    characteristic->value = g_byte_array_ref(byteArray);
 
     if (application->on_char_updated != NULL) {
         application->on_char_updated(characteristic->application, characteristic->service_uuid,
