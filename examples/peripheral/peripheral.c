@@ -166,7 +166,7 @@ void publish_is_authenticated() {
     GByteArray *byteArray = g_byte_array_new();
     g_byte_array_append(byteArray, (const guint8 *)value, strlen(value));
     binc_application_set_char_value(app, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, byteArray);
-    g_byte_array_free(byteArray, TRUE);
+    g_byte_array_unref(byteArray);
 }
 
 // Timer callback to publish is_authenticated every second
@@ -189,7 +189,7 @@ void publish_tcu_info() {
 
     log_debug(TAG, "Published TCU info: %s", tcu_info);
 
-    g_byte_array_free(byteArray, TRUE);
+    g_byte_array_unref(byteArray);
 }
 
 gboolean publish_tcu_info_periodically(gpointer user_data) {
@@ -522,7 +522,7 @@ void *can_write_thread(void *arg) {
 
             log_debug(TAG, "Writing CAN data to characteristic");
             binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
-            g_byte_array_free(byteArray, TRUE);
+            g_byte_array_unref(byteArray);
         }
     }
 }
