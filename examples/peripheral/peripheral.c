@@ -152,7 +152,7 @@ void ble_install_auth_service()
             app,
             AUTH_SERVICE_UUID,
             IS_AUTHENTICATED_CHAR_UUID,
-            GATT_CHR_PROP_READ);
+            GATT_CHR_PROP_READ | GATT_CHR_PROP_NOTIFY);
 }
 
 void on_powered_state_changed(Adapter *adapter, gboolean state) {
@@ -163,7 +163,7 @@ void publish_is_authenticated() {
     const char *value = is_authenticated ? "true" : "false";
     GByteArray *byteArray = g_byte_array_new();
     g_byte_array_append(byteArray, (const guint8 *)value, strlen(value));
-    binc_application_set_char_value(app, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, byteArray);
+	binc_application_notify(app, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, byteArray);
     g_byte_array_free(byteArray, TRUE);
 }
 
