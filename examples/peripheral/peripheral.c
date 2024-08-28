@@ -50,6 +50,8 @@
 #define CAN_FRAME_SIZE sizeof(struct can_frame)
 #define TIMESTAMP_SIZE sizeof(struct timeval)
 #define CAN_DATA_LEN (NUM_CAN_IDS * (CAN_FRAME_SIZE + TIMESTAMP_SIZE + sizeof(canid_t)))
+#define TCU_INFO_MAX_LENGTH 18 // IMEI (15) + comma (1) + device ID (1) + null terminator (1)
+
 
 // Customizable interval for writing CAN data to characteristic (in seconds)
 #define DEFAULT_WRITE_INTERVAL 100
@@ -61,7 +63,10 @@
 #define IMEI_LENGTH 15
 #define TO_MILLIS 0.001
 
+#define DEVICE_ID "1" // Define device_id as "1" for now
 
+// Global buffer for TCU info
+char tcu_info[TCU_INFO_MAX_LENGTH] = {0}; 
 
 char imei[IMEI_LENGTH + 1] = {0};
 int tty_fd = -1;
@@ -523,8 +528,9 @@ void *read_imei_thread(void *arg) {
                 pthread_mutex_lock(&can_data_mutex);
                 strncpy(imei, buffer, IMEI_LENGTH);  // IMEI is 15 digits
                 imei[IMEI_LENGTH] = '\0';
+			    snprintf(tcu_info, sizeof(tcu_info), "%s,%s", imei, DEVICE_ID);
                 pthread_mutex_unlock(&can_data_mutex);
-                log_info(TAG, "IMEI: %s", imei);
+                log_info(TAG, "TCU_INFO: %s", tcu_info);
             } else if (strstr(buffer, "ERROR")) {
                 log_error(TAG, "ERROR: Could not determine IMEI");
             }
