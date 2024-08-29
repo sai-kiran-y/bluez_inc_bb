@@ -1264,15 +1264,19 @@ void binc_application_set_char_stop_notify_cb(Application *application, onLocalC
 
 int binc_application_notify(const Application *application, const char *service_uuid, const char *char_uuid,
                             const GByteArray *byteArray) {
+    log_debug(TAG, "inside binc_application_notify");
+    g_return_val_if_fail(application != NULL, EINVAL);
+    g_return_val_if_fail(service_uuid != NULL, EINVAL);
+    g_return_val_if_fail(char_uuid != NULL, EINVAL);
+    g_return_val_if_fail(byteArray != NULL, EINVAL);
+    g_return_val_if_fail(is_valid_uuid(service_uuid), EINVAL);
+    g_return_val_if_fail(is_valid_uuid(char_uuid), EINVAL);
 
-    g_return_val_if_fail (application != NULL, EINVAL);
-    g_return_val_if_fail (byteArray != NULL, EINVAL);
-    g_return_val_if_fail (is_valid_uuid(service_uuid), EINVAL);
-    g_return_val_if_fail (is_valid_uuid(char_uuid), EINVAL);
-
+    log_debug(TAG, "calling get_local_characteristic");
     LocalCharacteristic *characteristic = get_local_characteristic(application, service_uuid, char_uuid);
+    log_debug(TAG, "after calling get_local_characteristic, characteristic = %p", characteristic);
     if (characteristic == NULL) {
-        g_critical("%s: characteristic %s does not exist", G_STRFUNC, service_uuid);
+        g_critical("%s: characteristic %s does not exist", G_STRFUNC, char_uuid);
         return EINVAL;
     }
 
@@ -1280,9 +1284,26 @@ int binc_application_notify(const Application *application, const char *service_
                                                        byteArray->data,
                                                        byteArray->len,
                                                        sizeof(guint8));
+    if (!valueVariant) {
+        log_error(TAG, "Failed to create GVariant for characteristic value.");
+        return EINVAL;
+    }
+
     GVariantBuilder *properties_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
+    if (!properties_builder) {
+        log_error(TAG, "Failed to create GVariantBuilder for properties.");
+        g_variant_unref(valueVariant);
+        return EINVAL;
+    }
+
     g_variant_builder_add(properties_builder, "{sv}", "Value", valueVariant);
     GVariantBuilder *invalidated_builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
+    if (!invalidated_builder) {
+        log_error(TAG, "Failed to create GVariantBuilder for invalidated properties.");
+        g_variant_unref(valueVariant);
+        g_variant_builder_unref(properties_builder);
+        return EINVAL;
+    }
 
     GError *error = NULL;
     gboolean result = g_dbus_connection_emit_signal(application->connection,
@@ -1297,18 +1318,22 @@ int binc_application_notify(const Application *application, const char *service_
 
     g_variant_builder_unref(invalidated_builder);
     g_variant_builder_unref(properties_builder);
+    g_variant_unref(valueVariant);
 
-    if (result != TRUE) {
+    if (!result) {
         if (error != NULL) {
-            log_debug(TAG, "error emitting signal: %s", error->message);
+            log_debug(TAG, "Error emitting signal: %s", error->message);
             g_clear_error(&error);
         }
+        log_error(TAG, "Failed to emit signal for characteristic %s", char_uuid);
         return EINVAL;
     }
 
+    // Log the byte array as a hex string
     GString *byteArrayStr = g_byte_array_as_hex(byteArray);
-    log_debug(TAG, "notified <%s> on <%s>", byteArrayStr->str, characteristic->uuid);
+    log_debug(TAG, "Notified <%s> on <%s>", byteArrayStr->str, characteristic->uuid);
     g_string_free(byteArrayStr, TRUE);
+
     return 0;
 }
 
