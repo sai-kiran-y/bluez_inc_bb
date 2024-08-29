@@ -476,9 +476,39 @@ void *read_imei_thread(void *arg) {
 
     char at_cmd[] = "AT+GSN\r";
     char buffer[256];
+	ssize_t n;
     while (1) {
+        tcflush(tty_fd, TCIFLUSH);
         write(tty_fd, at_cmd, strlen(at_cmd));
         memset(buffer, 0, sizeof(buffer));
+        usleep(100000);  // Small delay to allow the device to respond
+
+        // Read the response until "OK" is detected
+        while ((n = read(tty_fd, buffer, sizeof(buffer) - 1)) > 0) {
+            buffer[n] = '\0';  // Null-terminate the string
+
+            // Check if "OK" is part of the response, indicating end of response
+            if (strstr(buffer, "OK")) {
+                // Find the start of the IMEI in the buffer
+                char *imei_start = strchr(buffer, '\n');
+                if (imei_start != NULL) {
+                    imei_start++; // Move past the newline character
+                    pthread_mutex_lock(&tcu_info_mutex);
+                    strncpy(imei, imei_start, IMEI_LENGTH);  // Copy only the IMEI digits
+                    imei[IMEI_LENGTH] = '\0';  // Ensure null termination
+			    	snprintf(tcu_info, sizeof(tcu_info), "%s,%s", imei, DEVICE_ID);
+                    pthread_mutex_unlock(&tcu_info_mutex);
+                    log_info(TAG, "IMEI: %s", imei);
+                }
+                break;  // Break the read loop once "OK" is found
+            }
+        }
+
+        if (n <= 0) {
+            log_error(TAG, "Failed to read full response from AT+GSN command");
+        }
+
+		/*
         int n = read(tty_fd, buffer, sizeof(buffer) - 1);
         if (n > 0) {
             buffer[n] = '\0';
@@ -493,6 +523,7 @@ void *read_imei_thread(void *arg) {
                 log_error(TAG, "ERROR: Could not determine IMEI");
             }
         }
+		*/
         sleep(3);
     }
 
