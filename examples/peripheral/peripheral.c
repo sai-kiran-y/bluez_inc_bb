@@ -180,7 +180,7 @@ gboolean publish_is_authenticated_periodically(gpointer user_data) {
 }
 
 void publish_tcu_info() {
-    pthread_mutex_lock(&tcu_info_mutex);
+    //pthread_mutex_lock(&tcu_info_mutex);
 	// Convert tcu_info to a byte array for publication
     GByteArray *byteArray = g_byte_array_new();
 	if (byteArray == NULL) {
@@ -191,8 +191,7 @@ void publish_tcu_info() {
     g_byte_array_append(byteArray, (const guint8 *)tcu_info, strlen(tcu_info));
     binc_application_notify(app, VEHICLE_SERVICE_UUID, TCU_INFO_CHAR_UUID, byteArray);
     log_debug(TAG, "Published TCU info: %s", tcu_info);
-	//g_byte_array_free(byteArray, TRUE); // Ensure the byte array is properly freed
-	g_byte_array_unref(byteArray); // Ensure the byte array is properly freed
+	g_byte_array_free(byteArray, TRUE); // Ensure the byte array is properly freed
     pthread_mutex_unlock(&tcu_info_mutex);
 }
 
