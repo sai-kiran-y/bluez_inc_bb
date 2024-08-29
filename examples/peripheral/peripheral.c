@@ -512,11 +512,10 @@ void *read_imei_thread(void *arg) {
                 char *imei_start = strchr(buffer, '\n');
                 if (imei_start != NULL) {
                     imei_start++; // Move past the newline character
-                    pthread_mutex_lock(&tcu_info_mutex);
+                    pthread_mutex_lock(&can_data_mutex);
                     strncpy(imei, imei_start, IMEI_LENGTH);  // Copy only the IMEI digits
                     imei[IMEI_LENGTH] = '\0';  // Ensure null termination
-			    	snprintf(tcu_info, sizeof(tcu_info), "%s,%s", imei, DEVICE_ID);
-                    pthread_mutex_unlock(&tcu_info_mutex);
+                    pthread_mutex_unlock(&can_data_mutex);
                     log_info(TAG, "IMEI: %s", imei);
                 }
                 break;  // Break the read loop once "OK" is found
