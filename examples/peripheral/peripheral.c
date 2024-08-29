@@ -67,6 +67,7 @@
 
 // Global buffer for TCU info
 char tcu_info[TCU_INFO_MAX_LENGTH] = {0}; 
+static pthread_mutex_t tcu_info_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 char imei[IMEI_LENGTH + 1] = {0};
 int tty_fd = -1;
@@ -138,7 +139,7 @@ void ble_install_vehicle_service()
             app,
             VEHICLE_SERVICE_UUID,
             TCU_INFO_CHAR_UUID,
-            GATT_CHR_PROP_READ);
+            GATT_CHR_PROP_READ | GATT_CHR_PROP_NOTIFY);
 }
 
 void ble_install_auth_service()
@@ -178,6 +179,27 @@ gboolean publish_is_authenticated_periodically(gpointer user_data) {
     return TRUE; // Returning TRUE ensures the function is called repeatedly
 }
 
+void publish_tcu_info() {
+    pthread_mutex_lock(&tcu_info_mutex);
+	// Convert tcu_info to a byte array for publication
+    GByteArray *byteArray = g_byte_array_new();
+	if (byteArray == NULL) {
+        log_error(TAG, "Failed to allocate memory for GByteArray.");
+        pthread_mutex_unlock(&tcu_info_mutex);
+        return;
+    }
+    g_byte_array_append(byteArray, (const guint8 *)tcu_info, strlen(tcu_info));
+    binc_application_notify(app, VEHICLE_SERVICE_UUID, TCU_INFO_CHAR_UUID, byteArray);
+    log_debug(TAG, "Published TCU info: %s", tcu_info);
+	//g_byte_array_free(byteArray, TRUE); // Ensure the byte array is properly freed
+	g_byte_array_unref(byteArray); // Ensure the byte array is properly freed
+    pthread_mutex_unlock(&tcu_info_mutex);
+}
+
+gboolean publish_tcu_info_periodically(gpointer user_data) {
+    publish_tcu_info();
+    return TRUE; // Keeps the periodic function running
+}
 
 void on_central_state_changed(Adapter *adapter, Device *device) {
     char *deviceToString = binc_device_to_string(device);
@@ -619,6 +641,9 @@ int main(void) {
 
 	// Start the timer to publish is_authenticated every 1 second
 	g_timeout_add_seconds(1, publish_is_authenticated_periodically, NULL);
+
+	// Start the timer to publish tcu_info every 1 second
+	g_timeout_add_seconds(1, publish_tcu_info_periodically, NULL);
 
     // Start the mainloop
     g_main_loop_run(loop);
