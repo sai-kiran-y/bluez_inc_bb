@@ -1337,6 +1337,29 @@ int binc_application_notify(const Application *application, const char *service_
     return 0;
 }
 
+// Wrapper function to handle retries and reset Bluetooth adapter if needed
+void safe_binc_application_notify(Application *app, const char *service_uuid, const char *char_uuid, GByteArray *byteArray) {
+    int retry_count = 0;
+    int max_retries = 3;
+    int success = 0;
+
+    while (retry_count < max_retries && !success) {
+        if (binc_application_notify(app, service_uuid, char_uuid, byteArray) == 0) {
+            success = 1;
+        } else {
+            log_error(TAG, "Notification failed, retrying...");
+            sleep(1); // Add a delay before retrying
+            retry_count++;
+        }
+    }
+
+    if (!success) {
+        log_error(TAG, "Failed to notify after multiple retries, resetting Bluetooth adapter.");
+        system("hciconfig hci0 reset");
+    }
+}
+
+
 gboolean binc_application_char_is_notifying(const Application *application, const char *service_uuid,
                                             const char *char_uuid) {
     g_return_val_if_fail (application != NULL, FALSE);
