@@ -159,13 +159,13 @@ typedef struct local_descriptor {
 static void binc_local_desc_free(LocalDescriptor *localDescriptor) {
     g_assert(localDescriptor != NULL);
 
-    log_debug(TAG, "freeing descriptor %s", localDescriptor->path);
+    //log_debug(TAG, "freeing descriptor %s", localDescriptor->path);
 
     if (localDescriptor->registration_id != 0) {
         gboolean result = g_dbus_connection_unregister_object(localDescriptor->application->connection,
                                                               localDescriptor->registration_id);
         if (!result) {
-            log_debug(TAG, "error: could not unregister descriptor %s", localDescriptor->path);
+            //log_debug(TAG, "error: could not unregister descriptor %s", localDescriptor->path);
         }
         localDescriptor->registration_id = 0;
     }
@@ -201,7 +201,7 @@ static void binc_local_desc_free(LocalDescriptor *localDescriptor) {
 static void binc_local_char_free(LocalCharacteristic *localCharacteristic) {
     g_assert(localCharacteristic != NULL);
 
-    log_debug(TAG, "freeing characteristic %s", localCharacteristic->path);
+    //log_debug(TAG, "freeing characteristic %s", localCharacteristic->path);
 
     if (localCharacteristic->descriptors != NULL) {
         g_hash_table_destroy(localCharacteristic->descriptors);
@@ -212,7 +212,7 @@ static void binc_local_char_free(LocalCharacteristic *localCharacteristic) {
         gboolean result = g_dbus_connection_unregister_object(localCharacteristic->application->connection,
                                                               localCharacteristic->registration_id);
         if (!result) {
-            log_debug(TAG, "error: could not unregister service %s", localCharacteristic->path);
+            //log_debug(TAG, "error: could not unregister service %s", localCharacteristic->path);
         }
         localCharacteristic->registration_id = 0;
     }
@@ -245,7 +245,7 @@ static void binc_local_char_free(LocalCharacteristic *localCharacteristic) {
 void binc_local_service_free(LocalService *localService) {
     g_assert(localService != NULL);
 
-    log_debug(TAG, "freeing service %s", localService->path);
+    //log_debug(TAG, "freeing service %s", localService->path);
 
     if (localService->characteristics != NULL) {
         g_hash_table_destroy(localService->characteristics);
@@ -256,7 +256,7 @@ void binc_local_service_free(LocalService *localService) {
         gboolean result = g_dbus_connection_unregister_object(localService->application->connection,
                                                               localService->registration_id);
         if (!result) {
-            log_debug(TAG, "error: could not unregister service %s", localService->path);
+            //log_debug(TAG, "error: could not unregister service %s", localService->path);
         }
         localService->registration_id = 0;
     }
@@ -305,8 +305,8 @@ static ReadOptions *parse_read_options(GVariant *params) {
     }
     g_variant_iter_free(optionsVariant);
 
-    log_debug(TAG, "read with offset=%u, mtu=%u, link=%s, device=%s", (unsigned int) options->offset,
-              (unsigned int) options->mtu, options->link_type, options->device);
+    //log_debug(TAG, "read with offset=%u, mtu=%u, link=%s, device=%s", (unsigned int) options->offset,
+              //(unsigned int) options->mtu, options->link_type, options->device);
 
     return options;
 }
@@ -348,8 +348,8 @@ static WriteOptions *parse_write_options(GVariant *optionsVariant) {
         }
     }
 
-    log_debug(TAG, "write with offset=%u, mtu=%u, link=%s, device=%s", (unsigned int) options->offset,
-              (unsigned int) options->mtu, options->link_type, options->device);
+    //log_debug(TAG, "write with offset=%u, mtu=%u, link=%s, device=%s", (unsigned int) options->offset,
+              //(unsigned int) options->mtu, options->link_type, options->device);
 
     return options;
 }
@@ -416,7 +416,7 @@ static void add_descriptors(GVariantBuilder *builder,
     g_hash_table_iter_init(&iter, localCharacteristic->descriptors);
     while (g_hash_table_iter_next(&iter, &key, &value)) {
         LocalDescriptor *localDescriptor = (LocalDescriptor *) value;
-        log_debug(TAG, "adding %s", localDescriptor->path);
+        //log_debug(TAG, "adding %s", localDescriptor->path);
 
         GVariantBuilder *descriptors_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sa{sv}}"));
         GVariantBuilder *desc_properties_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
@@ -451,7 +451,7 @@ static void add_characteristics(GVariantBuilder *builder, LocalService *localSer
     g_hash_table_iter_init(&iter, localService->characteristics);
     while (g_hash_table_iter_next(&iter, &key, &value)) {
         LocalCharacteristic *localCharacteristic = (LocalCharacteristic *) value;
-        log_debug(TAG, "adding %s", localCharacteristic->path);
+        //log_debug(TAG, "adding %s", localCharacteristic->path);
 
         GVariantBuilder *characteristic_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sa{sv}}"));
         GVariantBuilder *char_properties_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
@@ -492,7 +492,7 @@ static void add_services(Application *application, GVariantBuilder *builder) {
     g_hash_table_iter_init(&iter, application->services);
     while (g_hash_table_iter_next(&iter, (gpointer) &key, &value)) {
         LocalService *localService = (LocalService *) value;
-        log_debug(TAG, "adding %s", localService->path);
+        //log_debug(TAG, "adding %s", localService->path);
         GVariantBuilder *service_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sa{sv}}"));
 
         // Build service properties
@@ -548,7 +548,7 @@ void binc_application_publish(Application *application, const Adapter *adapter) 
     GError *error = NULL;
     GDBusNodeInfo *info = g_dbus_node_info_new_for_xml(object_manager_xml, &error);
     if (error) {
-        log_debug(TAG, "Unable to create manager node: %s\n", error->message);
+        //log_debug(TAG, "Unable to create manager node: %s\n", error->message);
         g_clear_error(&error);
         return;
     }
@@ -563,12 +563,12 @@ void binc_application_publish(Application *application, const Adapter *adapter) 
     g_dbus_node_info_unref(info);
 
     if (application->registration_id == 0 && error != NULL) {
-        log_debug(TAG, "failed to publish application");
+        //log_debug(TAG, "failed to publish application");
         g_clear_error(&error);
         return;
     }
 
-    log_debug(TAG, "successfully published application");
+    //log_debug(TAG, "successfully published application");
 }
 
 Application *binc_create_application(const Adapter *adapter) {
@@ -590,7 +590,7 @@ Application *binc_create_application(const Adapter *adapter) {
 void binc_application_free(Application *application) {
     g_assert(application != NULL);
 
-    log_debug(TAG, "freeing application %s", application->path);
+    //log_debug(TAG, "freeing application %s", application->path);
 
     if (application->services != NULL) {
         g_hash_table_destroy(application->services);
@@ -600,7 +600,7 @@ void binc_application_free(Application *application) {
     if (application->registration_id != 0) {
         gboolean result = g_dbus_connection_unregister_object(application->connection, application->registration_id);
         if (!result) {
-            log_debug(TAG, "error: could not unregister application %s", application->path);
+            //log_debug(TAG, "error: could not unregister application %s", application->path);
         }
         application->registration_id = 0;
     }
@@ -622,7 +622,7 @@ int binc_application_add_service(Application *application, const char *service_u
     GError *error = NULL;
     GDBusNodeInfo *info = g_dbus_node_info_new_for_xml(service_xml, &error);
     if (error) {
-        log_debug(TAG, "Unable to create service node: %s\n", error->message);
+        //log_debug(TAG, "Unable to create service node: %s\n", error->message);
         g_clear_error(&error);
         return EINVAL;
     }
@@ -651,15 +651,15 @@ int binc_application_add_service(Application *application, const char *service_u
     g_dbus_node_info_unref(info);
 
     if (localService->registration_id == 0) {
-        log_debug(TAG, "failed to publish local service");
-        log_debug(TAG, "Error %s", error->message);
+        //log_debug(TAG, "failed to publish local service");
+        //log_debug(TAG, "Error %s", error->message);
         g_hash_table_remove(application->services, service_uuid);
         binc_local_service_free(localService);
         g_clear_error(&error);
         return EINVAL;
     }
 
-    log_debug(TAG, "successfully published local service %s", service_uuid);
+    //log_debug(TAG, "successfully published local service %s", service_uuid);
     return 0;
 }
 
@@ -735,22 +735,22 @@ static int binc_characteristic_set_value(const Application *application, LocalCh
     g_return_val_if_fail (characteristic != NULL, EINVAL);
     g_return_val_if_fail (byteArray != NULL, EINVAL);
 
-    log_debug(TAG, "inside binc_characteristic_set_value");
+    //log_debug(TAG, "inside binc_characteristic_set_value");
     GString *byteArrayStr = g_byte_array_as_hex(byteArray);
-    log_debug(TAG, "set value <%s> to <%s>", byteArrayStr->str, characteristic->uuid);
-	log_debug(TAG,"freeing byteArrayStr=GByteArray");
+    //log_debug(TAG, "set value <%s> to <%s>", byteArrayStr->str, characteristic->uuid);
+	//log_debug(TAG,"freeing byteArrayStr=GByteArray");
     g_string_free(byteArrayStr, TRUE);
-	log_debug(TAG,"freed byteArrayStr=GByteArray");
+	//log_debug(TAG,"freed byteArrayStr=GByteArray");
 
 	
     if (characteristic->value != NULL) {
-	 	log_debug(TAG,"freeing characteristic->value=%d", characteristic->value);
+	 	//log_debug(TAG,"freeing characteristic->value=%d", characteristic->value);
         //g_byte_array_free(characteristic->value, TRUE);
 	        // Decrease the reference count properly to avoid reference count issues
         g_byte_array_unref(characteristic->value);
         characteristic->value = NULL;  // Clear the pointer to avoid double unref
     }
-    log_debug(TAG, "freed characteristic->value");
+    //log_debug(TAG, "freed characteristic->value");
     characteristic->value = g_byte_array_ref(byteArray);
 
     if (application->on_char_updated != NULL) {
@@ -768,7 +768,7 @@ static int binc_descriptor_set_value(const Application *application, LocalDescri
     g_return_val_if_fail (byteArray != NULL, EINVAL);
 
     GString *byteArrayStr = g_byte_array_as_hex(byteArray);
-    log_debug(TAG, "set value <%s> to <%s>", byteArrayStr->str, descriptor->uuid);
+    //log_debug(TAG, "set value <%s> to <%s>", byteArrayStr->str, descriptor->uuid);
     g_string_free(byteArrayStr, TRUE);
 
     if (descriptor->value != NULL) {
@@ -831,7 +831,7 @@ static void binc_internal_descriptor_method_call(GDBusConnection *conn,
     if (g_str_equal(method, DESCRIPTOR_METHOD_READ_VALUE)) {
         ReadOptions *options = parse_read_options(params);
 
-        log_debug(TAG, "read descriptor <%s> by ", localDescriptor->uuid, options->device);
+        //log_debug(TAG, "read descriptor <%s> by ", localDescriptor->uuid, options->device);
 
         const char *result = NULL;
         if (application->on_desc_read != NULL) {
@@ -843,7 +843,7 @@ static void binc_internal_descriptor_method_call(GDBusConnection *conn,
 
         if (result) {
             g_dbus_method_invocation_return_dbus_error(invocation, result, "read descriptor error");
-            log_debug(TAG, "read descriptor error");
+            //log_debug(TAG, "read descriptor error");
             return;
         }
 
@@ -863,7 +863,7 @@ static void binc_internal_descriptor_method_call(GDBusConnection *conn,
         WriteOptions *options = parse_write_options(optionsVariant);
         g_variant_unref(optionsVariant);
 
-        log_debug(TAG, "write descriptor <%s> by %s", localDescriptor->uuid, options->device);
+        //log_debug(TAG, "write descriptor <%s> by %s", localDescriptor->uuid, options->device);
 
         size_t data_length = 0;
         guint8 *data = (guint8 *) g_variant_get_fixed_array(valueVariant, &data_length, sizeof(guint8));
@@ -885,7 +885,7 @@ static void binc_internal_descriptor_method_call(GDBusConnection *conn,
 
         if (result) {
             g_dbus_method_invocation_return_dbus_error(invocation, result, "write error");
-            log_debug(TAG, "write error");
+            //log_debug(TAG, "write error");
             return;
         }
 
@@ -913,7 +913,7 @@ int binc_application_add_descriptor(Application *application, const char *servic
     GError *error = NULL;
     GDBusNodeInfo *info = g_dbus_node_info_new_for_xml(descriptor_xml, &error);
     if (error) {
-        log_debug(TAG, "Unable to create descriptor node: %s\n", error->message);
+        //log_debug(TAG, "Unable to create descriptor node: %s\n", error->message);
         g_clear_error(&error);
         return EINVAL;
     }
@@ -941,20 +941,20 @@ int binc_application_add_descriptor(Application *application, const char *servic
     g_dbus_node_info_unref(info);
 
     if (localDescriptor->registration_id == 0) {
-        log_debug(TAG, "failed to publish local characteristic");
-        log_debug(TAG, "Error %s", error->message);
+        //log_debug(TAG, "failed to publish local characteristic");
+        //log_debug(TAG, "Error %s", error->message);
         g_clear_error(&error);
         g_hash_table_remove(localCharacteristic->descriptors, desc_uuid);
         return EINVAL;
     }
 
-    log_debug(TAG, "successfully published local descriptor %s", desc_uuid);
+    //log_debug(TAG, "successfully published local descriptor %s", desc_uuid);
     return 0;
 }
 
 int binc_application_set_char_value(const Application *application, const char *service_uuid,
                                     const char *char_uuid, GByteArray *byteArray) {
-	log_debug(TAG, "inside binc_application_set_char_value"); 
+	//log_debug(TAG, "inside binc_application_set_char_value"); 
     g_return_val_if_fail (application != NULL, EINVAL);
     g_return_val_if_fail (service_uuid != NULL, EINVAL);
     g_return_val_if_fail (char_uuid != NULL, EINVAL);
@@ -962,9 +962,9 @@ int binc_application_set_char_value(const Application *application, const char *
     g_return_val_if_fail (is_valid_uuid(service_uuid), EINVAL);
     g_return_val_if_fail (is_valid_uuid(char_uuid), EINVAL);
 
-	log_debug(TAG, "calling get_local_characteristic"); 
+	//log_debug(TAG, "calling get_local_characteristic"); 
     LocalCharacteristic *characteristic = get_local_characteristic(application, service_uuid, char_uuid);
-	log_debug(TAG, "after calling get_local_characteristic, characteristic = %d", characteristic); 
+	//log_debug(TAG, "after calling get_local_characteristic, characteristic = %d", characteristic); 
     if (characteristic == NULL) {
         g_critical("%s: characteristic with uuid %s does not exist", G_STRFUNC, char_uuid);
         return EINVAL;
@@ -973,7 +973,7 @@ int binc_application_set_char_value(const Application *application, const char *
 	if (byteArray == NULL) {
 		log_error(TAG, "byteArray is NULL");
 	}
-	log_debug(TAG, "calling binc_characteristic_set_value: bytearray=%d", byteArray); 
+	//log_debug(TAG, "calling binc_characteristic_set_value: bytearray=%d", byteArray); 
     return binc_characteristic_set_value(application, characteristic, byteArray);
 }
 
@@ -1029,7 +1029,7 @@ static void binc_internal_characteristic_method_call(GDBusConnection *conn,
     g_assert(application != NULL);
 
     if (g_str_equal(method, CHARACTERISTIC_METHOD_READ_VALUE)) {
-        log_debug(TAG, "read <%s>", characteristic->uuid);
+        //log_debug(TAG, "read <%s>", characteristic->uuid);
         ReadOptions *options = parse_read_options(params);
 
         // Allow application to accept/reject the characteristic value before setting it
@@ -1043,7 +1043,7 @@ static void binc_internal_characteristic_method_call(GDBusConnection *conn,
 
         if (result) {
             g_dbus_method_invocation_return_dbus_error(invocation, result, "read characteristic error");
-            log_debug(TAG, "read characteristic error '%s'", result);
+            //log_debug(TAG, "read characteristic error '%s'", result);
             return;
         }
 
@@ -1058,7 +1058,7 @@ static void binc_internal_characteristic_method_call(GDBusConnection *conn,
             g_dbus_method_invocation_return_dbus_error(invocation, BLUEZ_ERROR_FAILED, "no value");
         }
     } else if (g_str_equal(method, CHARACTERISTIC_METHOD_WRITE_VALUE)) {
-        log_debug(TAG, "write <%s>", characteristic->uuid);
+        //log_debug(TAG, "write <%s>", characteristic->uuid);
 
         g_assert(g_str_equal(g_variant_get_type_string(params), "(aya{sv})"));
         GVariant *valueVariant, *optionsVariant;
@@ -1083,7 +1083,7 @@ static void binc_internal_characteristic_method_call(GDBusConnection *conn,
 
         if (result) {
             g_dbus_method_invocation_return_dbus_error(invocation, result, "write error");
-            log_debug(TAG, "write error");
+            //log_debug(TAG, "write error");
             return;
         }
 
@@ -1095,7 +1095,7 @@ static void binc_internal_characteristic_method_call(GDBusConnection *conn,
 
         g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
     } else if (g_str_equal(method, CHARACTERISTIC_METHOD_START_NOTIFY)) {
-        log_debug(TAG, "start notify <%s>", characteristic->uuid);
+        //log_debug(TAG, "start notify <%s>", characteristic->uuid);
 
         characteristic->notifying = TRUE;
         g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
@@ -1105,7 +1105,7 @@ static void binc_internal_characteristic_method_call(GDBusConnection *conn,
                                               characteristic->uuid);
         }
     } else if (g_str_equal(method, CHARACTERISTIC_METHOD_STOP_NOTIFY)) {
-        log_debug(TAG, "stop notify <%s>", characteristic->uuid);
+        //log_debug(TAG, "stop notify <%s>", characteristic->uuid);
 
         characteristic->notifying = FALSE;
         g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
@@ -1115,7 +1115,7 @@ static void binc_internal_characteristic_method_call(GDBusConnection *conn,
                                              characteristic->uuid);
         }
     } else if (g_str_equal(method, CHARACTERISTIC_METHOD_CONFIRM)) {
-        log_debug(TAG, "indication confirmed <%s>", characteristic->uuid);
+        //log_debug(TAG, "indication confirmed <%s>", characteristic->uuid);
         g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
     }
 }
@@ -1128,7 +1128,7 @@ GVariant *characteristic_get_property(GDBusConnection *connection,
                                       GError **error,
                                       gpointer user_data) {
 
-    log_debug(TAG, "local characteristic get property : %s", property_name);
+    //log_debug(TAG, "local characteristic get property : %s", property_name);
     LocalCharacteristic *characteristic = (LocalCharacteristic *) user_data;
     g_assert(characteristic != NULL);
 
@@ -1170,7 +1170,7 @@ int binc_application_add_characteristic(Application *application, const char *se
     GDBusNodeInfo *info = NULL;
     info = g_dbus_node_info_new_for_xml(characteristic_xml, &error);
     if (error) {
-        log_debug(TAG, "Unable to create node: %s\n", error->message);
+        //log_debug(TAG, "Unable to create node: %s\n", error->message);
         g_clear_error(&error);
         return EINVAL;
     }
@@ -1204,14 +1204,14 @@ int binc_application_add_characteristic(Application *application, const char *se
     g_dbus_node_info_unref(info);
 
     if (characteristic->registration_id == 0) {
-        log_debug(TAG, "failed to publish local characteristic");
-        log_debug(TAG, "Error %s", error->message);
+        //log_debug(TAG, "failed to publish local characteristic");
+        //log_debug(TAG, "Error %s", error->message);
         g_clear_error(&error);
         g_hash_table_remove(localService->characteristics, char_uuid);
         return EINVAL;
     }
 
-    log_debug(TAG, "successfully published local characteristic %s", char_uuid);
+    //log_debug(TAG, "successfully published local characteristic %s", char_uuid);
     return 0;
 }
 
@@ -1264,7 +1264,7 @@ void binc_application_set_char_stop_notify_cb(Application *application, onLocalC
 
 int binc_application_notify(const Application *application, const char *service_uuid, const char *char_uuid,
                             const GByteArray *byteArray) {
-    log_debug(TAG, "inside binc_application_notify");
+    //log_debug(TAG, "inside binc_application_notify");
     g_return_val_if_fail(application != NULL, EINVAL);
     g_return_val_if_fail(service_uuid != NULL, EINVAL);
     g_return_val_if_fail(char_uuid != NULL, EINVAL);
@@ -1272,9 +1272,9 @@ int binc_application_notify(const Application *application, const char *service_
     g_return_val_if_fail(is_valid_uuid(service_uuid), EINVAL);
     g_return_val_if_fail(is_valid_uuid(char_uuid), EINVAL);
 
-    log_debug(TAG, "calling get_local_characteristic");
+    //log_debug(TAG, "calling get_local_characteristic");
     LocalCharacteristic *characteristic = get_local_characteristic(application, service_uuid, char_uuid);
-    log_debug(TAG, "after calling get_local_characteristic, characteristic = %p", characteristic);
+    //log_debug(TAG, "after calling get_local_characteristic, characteristic = %p", characteristic);
     if (characteristic == NULL) {
         g_critical("%s: characteristic %s does not exist", G_STRFUNC, char_uuid);
         return EINVAL;
@@ -1322,7 +1322,7 @@ int binc_application_notify(const Application *application, const char *service_
 
     if (!result) {
         if (error != NULL) {
-            log_debug(TAG, "Error emitting signal: %s", error->message);
+            //log_debug(TAG, "Error emitting signal: %s", error->message);
             g_clear_error(&error);
         }
         log_error(TAG, "Failed to emit signal for characteristic %s", char_uuid);
@@ -1331,7 +1331,7 @@ int binc_application_notify(const Application *application, const char *service_
 
     // Log the byte array as a hex string
     GString *byteArrayStr = g_byte_array_as_hex(byteArray);
-    log_debug(TAG, "Notified <%s> on <%s>", byteArrayStr->str, characteristic->uuid);
+    //log_debug(TAG, "Notified <%s> on <%s>", byteArrayStr->str, characteristic->uuid);
     g_string_free(byteArrayStr, TRUE);
 
     return 0;
