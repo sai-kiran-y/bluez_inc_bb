@@ -1355,7 +1355,7 @@ int binc_application_notify(const Application *application, const char *service_
 
 
 
-void safe_binc_application_notify(Application *app, const char *service_uuid, const char *char_uuid, GByteArray *byteArray) {
+void safe_binc_application_notify(const Application *app, const char *service_uuid, const char *char_uuid, const GByteArray *byteArray) {
     int retry_count = 0;
     int max_retries = 3;
     gboolean success = FALSE;

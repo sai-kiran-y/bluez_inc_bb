@@ -114,6 +114,8 @@ int binc_application_set_desc_value(const Application *application, const char *
 int binc_application_notify(const Application *application, const char *service_uuid, const char *char_uuid,
                             const GByteArray *byteArray);
 
+void safe_binc_application_notify(const Application *application, const char *service_uuid, const char *char_uuid,
+                            const GByteArray *byteArray);
 gboolean binc_application_char_is_notifying(const Application *application, const char *service_uuid,
                                             const char *char_uuid);
 
