@@ -54,7 +54,7 @@
 
 
 // Customizable interval for writing CAN data to characteristic (in seconds)
-#define DEFAULT_WRITE_INTERVAL 100
+#define DEFAULT_WRITE_INTERVAL 3000
 
 #define AT_COMMAND "AT+GSN\r"
 #define DEVICE_PORT "/dev/ttyUSB0"
@@ -515,7 +515,7 @@ void *can_write_thread(void *arg) {
             g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
             pthread_mutex_unlock(&can_data_mutex);
 
-            log_debug(TAG, "Writing CAN data to characteristic");
+            //log_debug(TAG, "Writing CAN data to characteristic");
             safe_binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
             g_byte_array_unref(byteArray);
         }
@@ -587,7 +587,7 @@ void *read_imei_thread(void *arg) {
             }
         }
 		*/
-        sleep(3);
+        usleep(100000);
     }
 
     close(tty_fd);
