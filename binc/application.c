@@ -1331,10 +1331,10 @@ int binc_application_notify(const Application *application, const char *service_
                                                     properties_changed,
                                                     &error);
 
-    g_variant_unref(properties_changed); // Clean up the properties_changed GVariant
-    g_variant_builder_unref(invalidated_builder); // Free GVariantBuilder objects
-    g_variant_builder_unref(properties_builder);
-    g_variant_unref(valueVariant); // Free the GVariant valueVariant
+    //g_variant_unref(properties_changed); // Clean up the properties_changed GVariant
+    //g_variant_builder_unref(invalidated_builder); // Free GVariantBuilder objects
+    //g_variant_builder_unref(properties_builder);
+    //g_variant_unref(valueVariant); // Free the GVariant valueVariant
 
     if (!result) {
         if (error != NULL) {
@@ -1347,7 +1347,6 @@ int binc_application_notify(const Application *application, const char *service_
 
     // Log the byte array as a hex string
     GString *byteArrayStr = g_byte_array_as_hex(byteArray);
-    //log_debug(TAG, "Notified <%s> on <%s>", byteArrayStr->str, characteristic->uuid);
     g_string_free(byteArrayStr, TRUE);
 
     return 0;

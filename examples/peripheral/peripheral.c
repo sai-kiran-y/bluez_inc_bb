@@ -180,7 +180,7 @@ gboolean publish_is_authenticated_periodically(gpointer user_data) {
 }
 
 void publish_tcu_info() {
-    //pthread_mutex_lock(&tcu_info_mutex);
+    pthread_mutex_lock(&tcu_info_mutex);
 	// Convert tcu_info to a byte array for publication
     GByteArray *byteArray = g_byte_array_new();
 	if (byteArray == NULL) {
