@@ -1262,9 +1262,10 @@ void binc_application_set_char_stop_notify_cb(Application *application, onLocalC
     application->on_char_stop_notify = callback;
 }
 
+
+// Wrapper function to handle retries and reset Bluetooth adapter if needed
 int binc_application_notify(const Application *application, const char *service_uuid, const char *char_uuid,
                             const GByteArray *byteArray) {
-    //log_debug(TAG, "inside binc_application_notify");
     g_return_val_if_fail(application != NULL, EINVAL);
     g_return_val_if_fail(service_uuid != NULL, EINVAL);
     g_return_val_if_fail(char_uuid != NULL, EINVAL);
@@ -1272,14 +1273,13 @@ int binc_application_notify(const Application *application, const char *service_
     g_return_val_if_fail(is_valid_uuid(service_uuid), EINVAL);
     g_return_val_if_fail(is_valid_uuid(char_uuid), EINVAL);
 
-    //log_debug(TAG, "calling get_local_characteristic");
     LocalCharacteristic *characteristic = get_local_characteristic(application, service_uuid, char_uuid);
-    //log_debug(TAG, "after calling get_local_characteristic, characteristic = %p", characteristic);
     if (characteristic == NULL) {
         g_critical("%s: characteristic %s does not exist", G_STRFUNC, char_uuid);
         return EINVAL;
     }
 
+    // Create GVariant for the byte array
     GVariant *valueVariant = g_variant_new_fixed_array(G_VARIANT_TYPE_BYTE,
                                                        byteArray->data,
                                                        byteArray->len,
@@ -1289,6 +1289,7 @@ int binc_application_notify(const Application *application, const char *service_
         return EINVAL;
     }
 
+    // Create GVariantBuilder for properties
     GVariantBuilder *properties_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
     if (!properties_builder) {
         log_error(TAG, "Failed to create GVariantBuilder for properties.");
@@ -1297,6 +1298,8 @@ int binc_application_notify(const Application *application, const char *service_
     }
 
     g_variant_builder_add(properties_builder, "{sv}", "Value", valueVariant);
+
+    // Create GVariantBuilder for invalidated properties
     GVariantBuilder *invalidated_builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
     if (!invalidated_builder) {
         log_error(TAG, "Failed to create GVariantBuilder for invalidated properties.");
@@ -1305,24 +1308,37 @@ int binc_application_notify(const Application *application, const char *service_
         return EINVAL;
     }
 
+    // Emit the signal
     GError *error = NULL;
+    GVariant *properties_changed = g_variant_new("(sa{sv}as)",
+                                                 "org.bluez.GattCharacteristic1",
+                                                 properties_builder,
+                                                 invalidated_builder);
+    
+    if (!properties_changed) {
+        log_error(TAG, "Failed to create GVariant for PropertiesChanged signal.");
+        g_variant_builder_unref(invalidated_builder);
+        g_variant_builder_unref(properties_builder);
+        g_variant_unref(valueVariant);
+        return EINVAL;
+    }
+
     gboolean result = g_dbus_connection_emit_signal(application->connection,
                                                     NULL,
                                                     characteristic->path,
                                                     "org.freedesktop.DBus.Properties",
                                                     "PropertiesChanged",
-                                                    g_variant_new("(sa{sv}as)",
-                                                                  "org.bluez.GattCharacteristic1",
-                                                                  properties_builder, invalidated_builder),
+                                                    properties_changed,
                                                     &error);
 
-    g_variant_builder_unref(invalidated_builder);
+    g_variant_unref(properties_changed); // Clean up the properties_changed GVariant
+    g_variant_builder_unref(invalidated_builder); // Free GVariantBuilder objects
     g_variant_builder_unref(properties_builder);
-    g_variant_unref(valueVariant);
+    g_variant_unref(valueVariant); // Free the GVariant valueVariant
 
     if (!result) {
         if (error != NULL) {
-            //log_debug(TAG, "Error emitting signal: %s", error->message);
+            log_error(TAG, "Error emitting signal: %s", error->message);
             g_clear_error(&error);
         }
         log_error(TAG, "Failed to emit signal for characteristic %s", char_uuid);
@@ -1331,31 +1347,34 @@ int binc_application_notify(const Application *application, const char *service_
 
     // Log the byte array as a hex string
     GString *byteArrayStr = g_byte_array_as_hex(byteArray);
-    //log_debug(TAG, "Notified <%s> on <%s>", byteArrayStr->str, characteristic->uuid);
+    log_debug(TAG, "Notified <%s> on <%s>", byteArrayStr->str, characteristic->uuid);
     g_string_free(byteArrayStr, TRUE);
 
     return 0;
 }
 
-// Wrapper function to handle retries and reset Bluetooth adapter if needed
+
+
 void safe_binc_application_notify(Application *app, const char *service_uuid, const char *char_uuid, GByteArray *byteArray) {
     int retry_count = 0;
     int max_retries = 3;
-    int success = 0;
+    gboolean success = FALSE;
 
     while (retry_count < max_retries && !success) {
-        if (binc_application_notify(app, service_uuid, char_uuid, byteArray) == 0) {
-            success = 1;
+        // Attempt to notify using the updated binc_application_notify function
+        int notify_result = binc_application_notify(app, service_uuid, char_uuid, byteArray);
+        if (notify_result == 0) {
+            success = TRUE; // Notification was successful
         } else {
-            log_error(TAG, "Notification failed, retrying...");
-            sleep(1); // Add a delay before retrying
+            log_error(TAG, "Notification failed, retrying... Attempt %d of %d", retry_count + 1, max_retries);
+            usleep(100 * 1000); // Sleep for 100ms before retrying
             retry_count++;
         }
     }
 
     if (!success) {
         log_error(TAG, "Failed to notify after multiple retries, resetting Bluetooth adapter.");
-        system("hciconfig hci0 reset");
+        system("hciconfig hci0 reset"); // Reset Bluetooth adapter on failure
     }
 }
 
