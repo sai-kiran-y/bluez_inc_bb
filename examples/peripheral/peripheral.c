@@ -516,7 +516,7 @@ void *can_write_thread(void *arg) {
             pthread_mutex_unlock(&can_data_mutex);
 
             log_debug(TAG, "Writing CAN data to characteristic");
-            binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
+            safe_binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
             g_byte_array_unref(byteArray);
         }
     }
