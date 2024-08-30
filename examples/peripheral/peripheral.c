@@ -170,7 +170,7 @@ void publish_is_authenticated() {
     GByteArray *byteArray = g_byte_array_new();
     g_byte_array_append(byteArray, (const guint8 *)value, strlen(value));
 	binc_application_notify(app, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, byteArray);
-    g_byte_array_free(byteArray, TRUE);
+    g_byte_array_unref(byteArray);
 }
 
 // Timer callback to publish is_authenticated every second
@@ -191,7 +191,7 @@ void publish_tcu_info() {
     g_byte_array_append(byteArray, (const guint8 *)tcu_info, strlen(tcu_info));
     binc_application_notify(app, VEHICLE_SERVICE_UUID, TCU_INFO_CHAR_UUID, byteArray);
     log_debug(TAG, "Published TCU info: %s", tcu_info);
-	g_byte_array_free(byteArray, TRUE); // Ensure the byte array is properly freed
+	g_byte_array_unref(byteArray); // Ensure the byte array is properly freed
     pthread_mutex_unlock(&tcu_info_mutex);
 }
 
@@ -293,7 +293,7 @@ const char *on_local_char_write(const Application *application, const char *addr
             //GByteArray *yesArray = g_byte_array_new();
             //g_byte_array_append(yesArray, yes_value, sizeof(yes_value));
             //binc_application_set_char_value(application, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, yesArray);
-            //g_byte_array_free(yesArray, TRUE);
+            //g_byte_array_unref(yesArray, TRUE);
 
             log_info(TAG, "Authentication successful, 'yes' written to IS_AUTHENTICATED_CHAR_UUID");
 
@@ -517,7 +517,7 @@ void *can_write_thread(void *arg) {
 
             log_debug(TAG, "Writing CAN data to characteristic");
             binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
-            g_byte_array_free(byteArray, TRUE);
+            g_byte_array_unref(byteArray);
         }
     }
 }
