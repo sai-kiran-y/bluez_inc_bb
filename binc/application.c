@@ -1347,7 +1347,7 @@ int binc_application_notify(const Application *application, const char *service_
 
     // Log the byte array as a hex string
     GString *byteArrayStr = g_byte_array_as_hex(byteArray);
-    log_debug(TAG, "Notified <%s> on <%s>", byteArrayStr->str, characteristic->uuid);
+    //log_debug(TAG, "Notified <%s> on <%s>", byteArrayStr->str, characteristic->uuid);
     g_string_free(byteArrayStr, TRUE);
 
     return 0;
