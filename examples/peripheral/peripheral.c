@@ -169,7 +169,7 @@ void publish_is_authenticated() {
     const char *value = is_authenticated ? "true" : "false";
     GByteArray *byteArray = g_byte_array_new();
     g_byte_array_append(byteArray, (const guint8 *)value, strlen(value));
-	binc_application_notify(app, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, byteArray);
+	safe_binc_application_notify(app, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, byteArray);
     g_byte_array_unref(byteArray);
 }
 
@@ -189,7 +189,7 @@ void publish_tcu_info() {
         return;
     }
     g_byte_array_append(byteArray, (const guint8 *)tcu_info, strlen(tcu_info));
-    binc_application_notify(app, VEHICLE_SERVICE_UUID, TCU_INFO_CHAR_UUID, byteArray);
+    safe_binc_application_notify(app, VEHICLE_SERVICE_UUID, TCU_INFO_CHAR_UUID, byteArray);
     log_debug(TAG, "Published TCU info: %s", tcu_info);
 	g_byte_array_unref(byteArray); // Ensure the byte array is properly freed
     pthread_mutex_unlock(&tcu_info_mutex);
