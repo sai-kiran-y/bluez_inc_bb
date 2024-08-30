@@ -189,6 +189,7 @@ void publish_tcu_info() {
         return;
     }
     g_byte_array_append(byteArray, (const guint8 *)tcu_info, strlen(tcu_info));
+	usleep(100000);
     binc_application_notify(app, VEHICLE_SERVICE_UUID, TCU_INFO_CHAR_UUID, byteArray);
     log_debug(TAG, "Published TCU info: %s", tcu_info);
 	g_byte_array_free(byteArray, TRUE); // Ensure the byte array is properly freed
