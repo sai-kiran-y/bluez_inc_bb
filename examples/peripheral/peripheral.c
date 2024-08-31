@@ -493,7 +493,7 @@ void *can_read_thread(void *arg) {
 
                 for (int i = 0; i < NUM_CAN_IDS; i++) {
                     struct can_frame *frame = &ble_can_id_arr[i];
-                    log_debug(TAG, "CAN ID: 0x%02X  Data:", i);
+                    log_debug(TAG, "CAN ID: 0x%02X  Data:\n", monitored_can_ids[i]);
                     for (int j = 0; j < frame->can_dlc; j++) {
                         printf("0x%02X ", frame->data[j]);
                     }
