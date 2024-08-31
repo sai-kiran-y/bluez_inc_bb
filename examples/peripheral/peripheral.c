@@ -190,7 +190,7 @@ void publish_tcu_info() {
     }
     g_byte_array_append(byteArray, (const guint8 *)tcu_info, strlen(tcu_info));
     safe_binc_application_notify(app, VEHICLE_SERVICE_UUID, TCU_INFO_CHAR_UUID, byteArray);
-    log_debug(TAG, "Published TCU info: %s", tcu_info);
+    //log_debug(TAG, "Published TCU info: %s", tcu_info);
 	g_byte_array_unref(byteArray); // Ensure the byte array is properly freed
     pthread_mutex_unlock(&tcu_info_mutex);
 }
@@ -560,7 +560,7 @@ void *read_imei_thread(void *arg) {
                     imei[IMEI_LENGTH] = '\0';  // Ensure null termination
 			    	snprintf(tcu_info, sizeof(tcu_info), "%s,%s", imei, DEVICE_ID);
                     pthread_mutex_unlock(&tcu_info_mutex);
-                    log_info(TAG, "IMEI: %s", imei);
+                    //log_info(TAG, "IMEI: %s", imei);
                 }
                 break;  // Break the read loop once "OK" is found
             }
@@ -587,7 +587,7 @@ void *read_imei_thread(void *arg) {
             }
         }
 		*/
-        usleep(100000);
+        usleep(50000);
     }
 
     close(tty_fd);
