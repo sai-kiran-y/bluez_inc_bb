@@ -21,6 +21,8 @@
 #include <termios.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <sys/time.h>  // Add this line
+
 
 #define TAG "Main"
 
@@ -84,10 +86,9 @@ const canid_t monitored_can_ids[NUM_CAN_IDS] = {
 
 static pthread_mutex_t can_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint8_t can_data[CAN_DATA_LEN];  // Buffer containing CAN ID, timestamp, and CAN data
-static struct {
-    struct can_frame frame;
-    struct timeval timestamp;
-} ble_can_id_arr[NUM_CAN_IDS];  // Array to store CAN frames and timestamps
+static struct timeval can_data_timestamp;  // Single timestamp for the entire collection of CAN IDs
+static struct can_frame ble_can_id_arr[NUM_CAN_IDS];  // Array to store CAN frames without individual timestamps
+
 
 static int write_interval = (DEFAULT_WRITE_INTERVAL) * (TO_MILLIS);
 
@@ -464,11 +465,11 @@ void *can_read_thread(void *arg) {
             pthread_mutex_lock(&can_data_mutex);
 			for (int i = 0; i < NUM_CAN_IDS; i++) {
     			if (frame.can_id == monitored_can_ids[i]) {
-        			ble_can_id_arr[i].frame = frame;
-        			ble_can_id_arr[i].timestamp = tv;
+        			ble_can_id_arr[i] = frame;
         			break;
     			}
 			}
+            gettimeofday(&can_data_timestamp, NULL);
 
             if (is_authenticated) {
                 // Update the global can_data buffer
@@ -477,20 +478,22 @@ void *can_read_thread(void *arg) {
 					uint8_t *data_ptr = can_data + i * (sizeof(canid_t) + CAN_FRAME_SIZE + TIMESTAMP_SIZE);
 					canid_t can_id = monitored_can_ids[i];
                     memcpy(data_ptr, &can_id, sizeof(canid_t));  // Copy CAN ID
-                    memcpy(data_ptr + sizeof(canid_t), &ble_can_id_arr[i].timestamp, TIMESTAMP_SIZE);  // Copy timestamp
-                    memcpy(data_ptr + sizeof(canid_t) + TIMESTAMP_SIZE, &ble_can_id_arr[i].frame, CAN_FRAME_SIZE);  // Copy CAN frame
+                    memcpy(data_ptr + sizeof(canid_t) + TIMESTAMP_SIZE, &ble_can_id_arr[i], CAN_FRAME_SIZE);  // Copy CAN frame
                 }
 
                 log_debug(TAG, "Updated CAN Data Buffer:");
+				/*
                 for (size_t i = 0; i < CAN_DATA_LEN; i++) {
                     log_debug(TAG, "%02X ", can_data[i]);
                 }
+				*/
 
                 // Log each CAN frame with its timestamp
+                log_debug(TAG, "Collection Timestamp: %ld.%06ld", can_data_timestamp.tv_sec, can_data_timestamp.tv_usec);
+
                 for (int i = 0; i < NUM_CAN_IDS; i++) {
-                    struct timeval *timestamp = &ble_can_id_arr[i].timestamp;
-                    struct can_frame *frame = &ble_can_id_arr[i].frame;
-                    log_debug(TAG, "CAN ID: 0x%02X Timestamp: %ld.%06ld Data:", i, timestamp->tv_sec, timestamp->tv_usec);
+                    struct can_frame *frame = &ble_can_id_arr[i];
+                    log_debug(TAG, "CAN ID: 0x%02X  Data:", i);
                     for (int j = 0; j < frame->can_dlc; j++) {
                         log_debug(TAG, " 0x%02X", frame->data[j]);
                     }
@@ -512,6 +515,11 @@ void *can_write_thread(void *arg) {
         if (is_authenticated) {
             pthread_mutex_lock(&can_data_mutex);
             GByteArray *byteArray = g_byte_array_new();
+
+            // First, append the timestamp for the collection
+            g_byte_array_append(byteArray, (const guint8 *)&can_data_timestamp, TIMESTAMP_SIZE);
+
+			// Append CAN data
             g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
             pthread_mutex_unlock(&can_data_mutex);
 
