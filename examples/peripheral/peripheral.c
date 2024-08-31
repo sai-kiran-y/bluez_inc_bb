@@ -495,7 +495,7 @@ void *can_read_thread(void *arg) {
                     struct can_frame *frame = &ble_can_id_arr[i];
                     log_debug(TAG, "CAN ID: 0x%02X  Data:", i);
                     for (int j = 0; j < frame->can_dlc; j++) {
-                        log_debug(TAG, " 0x%02X", frame->data[j]);
+                        printf("0x%02X ", frame->data[j]);
                     }
                 }
             }
