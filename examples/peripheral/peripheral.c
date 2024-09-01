@@ -610,6 +610,44 @@ void *read_imei_thread(void *arg) {
     return NULL;
 }
 
+void handle_hardware_error() {
+    log_error(TAG, "Handling hardware error 0x00.");
+    // Add your custom logic to handle the error here.
+}
+
+void *monitor_dmesg_for_hardware_error(void *arg) {
+    FILE *fp;
+    char buffer[256];
+
+    while (1) {
+        // Open the dmesg command for reading
+        fp = popen("dmesg | tail -n 1", "r");
+        if (fp == NULL) {
+            log_error(TAG, "Failed to run dmesg command");
+            sleep(1); // Sleep to avoid tight loop
+            continue;
+        }
+
+        // Read the output a line at a time
+        while (fgets(buffer, sizeof(buffer) - 1, fp) != NULL) {
+            if (strstr(buffer, "Bluetooth: hci0: hardware error 0x00")) {
+                log_error(TAG, "Detected hardware error 0x00.");
+                pclose(fp);
+
+                // Call the function to handle hardware error
+                handle_hardware_error();
+
+                return NULL; // Exit thread after handling
+            }
+        }
+
+        // Close the dmesg command pipe
+        pclose(fp);
+        sleep(1); // Check dmesg every 1 second
+    }
+}
+
+
 int main(void) {
 
     log_set_level(LOG_DEBUG);
@@ -677,6 +715,11 @@ int main(void) {
         // Create IMEI read thread
         pthread_t imei_read_tid;
         pthread_create(&imei_read_tid, NULL, read_imei_thread, NULL);
+
+		// Start the dmesg monitoring thread
+	    pthread_t dmesg_monitor_tid;
+    	pthread_create(&dmesg_monitor_tid, NULL, monitor_dmesg_for_hardware_error, NULL);
+
     } else {
         log_debug("MAIN", "No adapter found");
     }
@@ -689,6 +732,7 @@ int main(void) {
 
 	// Start the timer to publish tcu_info every 1 second
 	g_timeout_add_seconds(1, publish_tcu_info_periodically, NULL);
+
 
     // Start the mainloop
     g_main_loop_run(loop);
