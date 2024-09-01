@@ -372,21 +372,28 @@ static void cleanup_handler(int signo) {
             binc_adapter_unregister_application(default_adapter, app);
             binc_application_free(app);
             app = NULL;
+        	log_debug(TAG, "binc_adapter_unregister_application");
+        	log_debug(TAG, "app!=NULL; free app");
         }
 
         if (advertisement != NULL) {
             binc_adapter_stop_advertising(default_adapter, advertisement);
             binc_advertisement_free(advertisement);
+        	log_debug(TAG, "binc_adapter_stop_advertising");
+        	log_debug(TAG, "advertisement!=NULL; free advertisement");
         }
 
         if (default_adapter != NULL) {
             binc_adapter_free(default_adapter);
             default_adapter = NULL;
+        	log_debug(TAG, "binc_adapter_free");
+        	log_debug(TAG, "default_adapter!=NULL; set adapter to NULL");
         }
 
         if (tty_fd != -1) {
             close(tty_fd);
             tty_fd = -1;
+        	log_debug(TAG, "close USB0 port");
         }
 
         g_main_loop_quit(loop);
