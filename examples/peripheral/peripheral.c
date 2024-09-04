@@ -163,6 +163,7 @@ void ble_install_auth_service()
 }
 
 void on_powered_state_changed(Adapter *adapter, gboolean state) {
+    sleep(2);
     log_debug(TAG, "powered '%s' (%s)", state ? "on" : "off", binc_adapter_get_path(adapter));
 }
 
