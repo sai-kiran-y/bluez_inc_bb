@@ -82,7 +82,8 @@ Device *connected_device = NULL;
 const canid_t monitored_can_ids[NUM_CAN_IDS] = {
     0x407, 0x520, 0x201, 0x306, 0x303, 0x305, 0x302, 0x322, 0x307, 0x100, 0x500
 };
-
+int hw_error = 0;
+GDBusConnection *dbusConnection = NULL;
 
 static pthread_mutex_t can_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint8_t can_data[CAN_DATA_LEN];  // Buffer containing CAN ID, timestamp, and CAN data
@@ -91,6 +92,7 @@ static struct can_frame ble_can_id_arr[NUM_CAN_IDS];  // Array to store CAN fram
 
 
 static int write_interval = (DEFAULT_WRITE_INTERVAL) * (TO_MILLIS);
+void uninitialize();
 
 void ble_install_vehicle_service()
 {
@@ -613,6 +615,9 @@ void *read_imei_thread(void *arg) {
 void handle_hardware_error() {
     log_error(TAG, "Handling hardware error 0x00.");
     // Add your custom logic to handle the error here.
+    hw_error = 1;	
+	uninitialize();
+
 }
 
 void *monitor_dmesg_for_hardware_error(void *arg) {
@@ -647,6 +652,74 @@ void *monitor_dmesg_for_hardware_error(void *arg) {
     }
 }
 
+void uninitialize() {
+    // Reset character arrays
+    pthread_mutex_lock(&tcu_info_mutex);
+    memset(tcu_info, 0, TCU_INFO_MAX_LENGTH);  // Clear TCU info buffer
+    pthread_mutex_unlock(&tcu_info_mutex);
+
+    memset(imei, 0, IMEI_LENGTH + 1);  // Clear IMEI buffer
+
+    // Reset pointers to NULL
+    loop = NULL;  // Reset GMainLoop pointer
+    default_adapter = NULL;  // Reset Adapter pointer
+    advertisement = NULL;  // Reset Advertisement pointer
+    app = NULL;  // Reset Application pointer
+    connected_device = NULL;  // Reset Device pointer
+
+    // Reset boolean flags
+    is_authenticated = FALSE;  // Reset authentication status
+
+    // Close file descriptors
+    if (tty_fd != -1) {
+        close(tty_fd);
+        tty_fd = -1;  // Reset file descriptor to -1
+    }
+
+    // Clear CAN data buffer
+    pthread_mutex_lock(&can_data_mutex);
+    memset(can_data, 0, CAN_DATA_LEN);  // Clear CAN data buffer
+    pthread_mutex_unlock(&can_data_mutex);
+
+    // Reset the timestamp
+    memset(&can_data_timestamp, 0, sizeof(struct timeval));  // Clear timestamp
+    if (app != NULL) {
+        binc_adapter_unregister_application(default_adapter, app);
+        binc_application_free(app);
+        app = NULL;
+        log_debug(TAG, "binc_adapter_unregister_application");
+        log_debug(TAG, "app!=NULL; free app");
+    }
+
+    if (advertisement != NULL) {
+        binc_adapter_stop_advertising(default_adapter, advertisement);
+        binc_advertisement_free(advertisement);
+        log_debug(TAG, "binc_adapter_stop_advertising");
+        log_debug(TAG, "advertisement!=NULL; free advertisement");
+    }
+
+    if (default_adapter != NULL) {
+        binc_adapter_free(default_adapter);
+        default_adapter = NULL;
+        log_debug(TAG, "binc_adapter_free");
+        log_debug(TAG, "default_adapter!=NULL; set adapter to NULL");
+    }
+
+    if (tty_fd != -1) {
+        close(tty_fd);
+        tty_fd = -1; 
+        log_debug(TAG, "close USB0 port");
+    }
+
+    log_debug(TAG, "Disconnecting from dbus in uninitalize");
+    // Disconnect from DBus
+    g_dbus_connection_close_sync(dbusConnection, NULL, NULL);
+    g_object_unref(dbusConnection);
+	log_debug(TAG,"dbusConnection after connection_close is %d",dbusConnection); 
+    log_debug(TAG, "Uninitialized global variables due to hardware error.");
+    g_main_loop_quit(loop);
+}
+
 
 int main(void) {
 
@@ -655,9 +728,11 @@ int main(void) {
     // Initialize can_data buffer
     memset(can_data, 0, CAN_DATA_LEN);
 
+	log_debug(TAG,"dbusConnection in main before get_sync is %d",dbusConnection); 
     // Get a DBus connection
-    GDBusConnection *dbusConnection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
-
+    dbusConnection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
+	log_debug(TAG,"dbusConnection in main after get_sync is %d",dbusConnection); 
+	
     // Setup handler for CTRL+C
     if (signal(SIGINT, cleanup_handler) == SIG_ERR)
         log_error(TAG, "can't catch SIGINT");
@@ -740,10 +815,14 @@ int main(void) {
     // Clean up mainloop
     g_main_loop_unref(loop);
 
+
+	if(hw_error) {
+        hw_error = 0;
+		main();
+	}
     // Disconnect from DBus
     g_dbus_connection_close_sync(dbusConnection, NULL, NULL);
     g_object_unref(dbusConnection);
-
     return 0;
 }
 
