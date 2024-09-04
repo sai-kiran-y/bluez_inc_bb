@@ -676,7 +676,7 @@ int main(void) {
     }
 
     // Bail out after some time
-    g_timeout_add_seconds(600, callback, loop);
+    //g_timeout_add_seconds(600, callback, loop);
 
 	// Start the timer to publish is_authenticated every 1 second
 	g_timeout_add_seconds(1, publish_is_authenticated_periodically, NULL);
