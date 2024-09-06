@@ -482,7 +482,7 @@ void *can_read_thread(void *arg) {
                     memcpy(data_ptr + sizeof(canid_t) + TIMESTAMP_SIZE, &ble_can_id_arr[i], CAN_FRAME_SIZE);  // Copy CAN frame
                 }
 
-                log_debug(TAG, "Updated CAN Data Buffer:");
+                //log_debug(TAG, "Updated CAN Data Buffer:");
 				/*
                 for (size_t i = 0; i < CAN_DATA_LEN; i++) {
                     log_debug(TAG, "%02X ", can_data[i]);
@@ -490,8 +490,9 @@ void *can_read_thread(void *arg) {
 				*/
 
                 // Log each CAN frame with its timestamp
-                log_debug(TAG, "Collection Timestamp: %ld.%06ld", can_data_timestamp.tv_sec, can_data_timestamp.tv_usec);
+                //log_debug(TAG, "Collection Timestamp: %ld.%06ld", can_data_timestamp.tv_sec, can_data_timestamp.tv_usec);
 
+                /*
                 for (int i = 0; i < NUM_CAN_IDS; i++) {
                     struct can_frame *frame = &ble_can_id_arr[i];
                     printf("\nCAN ID: 0x%02X  Data:", monitored_can_ids[i]);
@@ -499,6 +500,7 @@ void *can_read_thread(void *arg) {
                         printf("0x%02X ", frame->data[j]);
                     }
                 }
+                */
             }
             pthread_mutex_unlock(&can_data_mutex);
         }
@@ -524,8 +526,18 @@ void *can_write_thread(void *arg) {
             g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
             pthread_mutex_unlock(&can_data_mutex);
 
+            // Print CAN data in hexadecimal format
+            for (size_t i = 0; i < byteArray->len; i++) {
+                printf("%02X ", byteArray->data[i]);
+                if ((i + 1) % 16 == 0) {
+                    printf("\n");  // Print a new line after every 16 bytes for readability
+                }
+            }
+            printf("\n");
+            
             //log_debug(TAG, "Writing CAN data to characteristic");
             safe_binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
+            sleep(10);
             g_byte_array_unref(byteArray);
         }
     }
