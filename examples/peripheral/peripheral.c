@@ -573,6 +573,7 @@ void *can_write_thread(void *arg) {
                 // Move to the next CAN frame position in the buffer
                 current_buffer += sizeof(canId) + 8;
             }
+            printf("DONE\n");
             pthread_mutex_unlock(&can_data_mutex);
             
             //log_debug(TAG, "Writing CAN data to characteristic");
