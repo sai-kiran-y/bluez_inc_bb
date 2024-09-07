@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <sys/time.h>  // Add this line
+#include <stdint.h>
 
 
 #define TAG "Main"
@@ -91,6 +92,31 @@ static struct can_frame ble_can_id_arr[NUM_CAN_IDS];  // Array to store CAN fram
 
 
 static int write_interval = (DEFAULT_WRITE_INTERVAL) * (TO_MILLIS);
+
+unsigned long long current_time_millis() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (unsigned long long)(tv.tv_sec) * 1000 + (tv.tv_usec / 1000);
+}
+
+uint64_t toLittleEndian64(uint64_t value) {
+    return ((value & 0xFF00000000000000) >> 56) |
+           ((value & 0x00FF000000000000) >> 40) |
+           ((value & 0x0000FF0000000000) >> 24) |
+           ((value & 0x000000FF00000000) >> 8) |
+           ((value & 0x00000000FF000000) << 8) |
+           ((value & 0x0000000000FF0000) << 24) |
+           ((value & 0x000000000000FF00) << 40) |
+           ((value & 0x00000000000000FF) << 56);
+}
+
+uint32_t toLittleEndian32(uint32_t value) {
+    return ((value & 0xFF000000) >> 24) |
+           ((value & 0x00FF0000) >> 8) |
+           ((value & 0x0000FF00) << 8) |
+           ((value & 0x000000FF) << 24);
+}
+
 
 void ble_install_vehicle_service()
 {
@@ -394,7 +420,6 @@ static void cleanup_handler(int signo) {
     }
 }
 
-// Thread for reading CAN data
 void *can_read_thread(void *arg) {
     int s;
     struct sockaddr_can addr;
@@ -454,54 +479,54 @@ void *can_read_thread(void *arg) {
             }
         }
 
-		gboolean is_monitored = FALSE;
-		for (int i = 0; i < NUM_CAN_IDS; i++) {
-    		if (frame.can_id == monitored_can_ids[i]) {
-        		is_monitored = TRUE;
-        		break;
-    		}
-		}
-
-		if (is_monitored) {
-            pthread_mutex_lock(&can_data_mutex);
-			for (int i = 0; i < NUM_CAN_IDS; i++) {
-    			if (frame.can_id == monitored_can_ids[i]) {
-        			ble_can_id_arr[i] = frame;
-        			break;
-    			}
-			}
-            gettimeofday(&can_data_timestamp, NULL);
-
-            if (is_authenticated) {
-                // Update the global can_data buffer
-                memset(can_data, 0, CAN_DATA_LEN);  // Clear buffer
-                for (int i = 0; i < NUM_CAN_IDS; i++) {
-					uint8_t *data_ptr = can_data + i * (sizeof(canid_t) + CAN_FRAME_SIZE + TIMESTAMP_SIZE);
-					canid_t can_id = monitored_can_ids[i];
-                    memcpy(data_ptr, &can_id, sizeof(canid_t));  // Copy CAN ID
-                    memcpy(data_ptr + sizeof(canid_t) + TIMESTAMP_SIZE, &ble_can_id_arr[i], CAN_FRAME_SIZE);  // Copy CAN frame
-                }
-
-                //log_debug(TAG, "Updated CAN Data Buffer:");
-				/*
-                for (size_t i = 0; i < CAN_DATA_LEN; i++) {
-                    log_debug(TAG, "%02X ", can_data[i]);
-                }
-				*/
-
-                // Log each CAN frame with its timestamp
-                //log_debug(TAG, "Collection Timestamp: %ld.%06ld", can_data_timestamp.tv_sec, can_data_timestamp.tv_usec);
-
-                /*
-                for (int i = 0; i < NUM_CAN_IDS; i++) {
-                    struct can_frame *frame = &ble_can_id_arr[i];
-                    printf("\nCAN ID: 0x%02X  Data:", monitored_can_ids[i]);
-                    for (int j = 0; j < frame->can_dlc; j++) {
-                        printf("0x%02X ", frame->data[j]);
-                    }
-                }
-                */
+        gboolean is_monitored = FALSE;
+        for (int i = 0; i < NUM_CAN_IDS; i++) {
+            if (frame.can_id == monitored_can_ids[i]) {
+                is_monitored = TRUE;
+                break;
             }
+        }
+
+        if (is_monitored) {
+            pthread_mutex_lock(&can_data_mutex);
+
+            // Update the specific CAN ID's frame in the array
+            for (int i = 0; i < NUM_CAN_IDS; i++) {
+                if (frame.can_id == monitored_can_ids[i]) {
+                    ble_can_id_arr[i] = frame;
+                    break;
+                }
+            }
+
+            // Clear the global can_data buffer
+            memset(can_data, 0, CAN_DATA_LEN);
+
+            // Get the current timestamp and convert it to little-endian format
+            unsigned long long timestamp = current_time_millis();
+            timestamp = toLittleEndian64(timestamp);
+
+            // Store timestamp at the beginning of the global can_data buffer
+            memcpy(can_data, &timestamp, sizeof(timestamp));
+
+            // Adjust the starting position in the buffer to account for the timestamp
+            uint8_t *current_buffer = can_data + sizeof(timestamp);
+
+            // Update the global can_data buffer with CAN IDs and their corresponding data
+            for (int i = 0; i < NUM_CAN_IDS; i++) {
+                // Convert CAN ID to little-endian format
+                uint32_t canId = ble_can_id_arr[i].can_id;
+                canId = toLittleEndian32(canId);
+
+                // Copy CAN ID to the buffer
+                memcpy(current_buffer, &canId, sizeof(canId));
+
+                // Copy data to the buffer
+                memcpy(current_buffer + sizeof(canId), ble_can_id_arr[i].data, 8);
+
+                // Move to the next CAN frame position in the buffer
+                current_buffer += sizeof(canId) + 8;
+            }
+
             pthread_mutex_unlock(&can_data_mutex);
         }
     }
@@ -512,6 +537,7 @@ void *can_read_thread(void *arg) {
 
 // Thread for writing CAN data to characteristic
 void *can_write_thread(void *arg) {
+    is_authenticated = TRUE;
     while (1) {
         sleep(write_interval);
         
@@ -520,7 +546,7 @@ void *can_write_thread(void *arg) {
             GByteArray *byteArray = g_byte_array_new();
 
             // First, append the timestamp for the collection
-            g_byte_array_append(byteArray, (const guint8 *)&can_data_timestamp, TIMESTAMP_SIZE);
+            //g_byte_array_append(byteArray, (const guint8 *)&can_data_timestamp, TIMESTAMP_SIZE);
 
 			// Append CAN data
             g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
