@@ -87,7 +87,7 @@ const canid_t monitored_can_ids[NUM_CAN_IDS] = {
 
 static pthread_mutex_t can_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 static uint8_t can_data[CAN_DATA_LEN];  // Buffer containing CAN ID, timestamp, and CAN data
-static struct timeval can_data_timestamp;  // Single timestamp for the entire collection of CAN IDs
+//static struct timeval can_data_timestamp;  // Single timestamp for the entire collection of CAN IDs
 static struct can_frame ble_can_id_arr[NUM_CAN_IDS];  // Array to store CAN frames without individual timestamps
 
 
@@ -550,16 +550,30 @@ void *can_write_thread(void *arg) {
 
 			// Append CAN data
             g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
-            pthread_mutex_unlock(&can_data_mutex);
 
-            // Print CAN data in hexadecimal format
-            for (size_t i = 0; i < byteArray->len; i++) {
-                printf("%02X ", byteArray->data[i]);
-                if ((i + 1) % 16 == 0) {
-                    printf("\n");  // Print a new line after every 16 bytes for readability
+            // Print CAN data in the format of "candump can0"
+            uint8_t *current_buffer = can_data + sizeof(unsigned long long);  // Skip timestamp part
+            for (int i = 0; i < NUM_CAN_IDS; i++) {
+                // Read CAN ID from buffer
+                uint32_t canId;
+                memcpy(&canId, current_buffer, sizeof(canId));
+                canId = toLittleEndian32(canId);  // Convert to little-endian format
+
+                // Read CAN data from buffer
+                uint8_t data[8];
+                memcpy(data, current_buffer + sizeof(canId), 8);
+
+                // Print in "candump can0" format
+                printf("can0  %03X  [8] ", canId);
+                for (int j = 0; j < 8; j++) {
+                    printf("%02X ", data[j]);
                 }
+                printf("\n");
+
+                // Move to the next CAN frame position in the buffer
+                current_buffer += sizeof(canId) + 8;
             }
-            printf("\n");
+            pthread_mutex_unlock(&can_data_mutex);
             
             //log_debug(TAG, "Writing CAN data to characteristic");
             safe_binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
