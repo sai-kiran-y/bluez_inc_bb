@@ -1375,7 +1375,7 @@ void safe_binc_application_notify(const Application *app, const char *service_uu
         log_error(TAG, "Failed to notify after multiple retries, resetting Bluetooth adapter.");
         int system_ret = system("hciconfig hci0 reset"); // Reset Bluetooth adapter on failure
         if(system_ret == -1) {
-            perror("Could not reset modem");
+            g_error("Could not reset modem");
         }
     }
 }
