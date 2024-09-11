@@ -550,31 +550,6 @@ gboolean send_can_data_periodically(gpointer user_data) {
 			// Append CAN data
             g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
 
-            /*
-            // Print CAN data in the format of "candump can0"
-            uint8_t *current_buffer = can_data + sizeof(unsigned long long);  // Skip timestamp part
-            for (int i = 0; i < NUM_CAN_IDS; i++) {
-                // Read CAN ID from buffer
-                uint32_t canId;
-                memcpy(&canId, current_buffer, sizeof(canId));
-                canId = toLittleEndian32(canId);  // Convert to little-endian format
-
-                // Read CAN data from buffer
-                uint8_t data[8];
-                memcpy(data, current_buffer + sizeof(canId), 8);
-
-                // Print in "candump can0" format
-                printf("can0  %03X  [8] ", canId);
-                for (int j = 0; j < 8; j++) {
-                    printf("%02X ", data[j]);
-                }
-                printf("\n");
-
-                // Move to the next CAN frame position in the buffer
-                current_buffer += sizeof(canId) + 8;
-            }
-            printf("DONE\n");
-            */
             pthread_mutex_unlock(&can_data_mutex);
             //sleep(2); 
             //log_debug(TAG, "Writing CAN data to characteristic");
@@ -582,6 +557,34 @@ gboolean send_can_data_periodically(gpointer user_data) {
             g_byte_array_unref(byteArray);
         }
         return TRUE;
+}
+
+gboolean print_can_data_periodically(gpointer user_data){
+
+    // Print CAN data in the format of "candump can0"
+    uint8_t *current_buffer = can_data + sizeof(unsigned long long);  // Skip timestamp part
+    for (int i = 0; i < NUM_CAN_IDS; i++) {
+        // Read CAN ID from buffer
+        uint32_t canId;
+        memcpy(&canId, current_buffer, sizeof(canId));
+        canId = toLittleEndian32(canId);  // Convert to little-endian format
+
+        // Read CAN data from buffer
+        uint8_t data[8];
+        memcpy(data, current_buffer + sizeof(canId), 8);
+
+        // Print in "candump can0" format
+        printf("can0  %03X  [8] ", canId);
+        for (int j = 0; j < 8; j++) {
+            printf("%02X ", data[j]);
+        }
+        printf("\n");
+
+        // Move to the next CAN frame position in the buffer
+        current_buffer += sizeof(canId) + 8;
+    }
+    printf("DONE\n");
+    return TRUE;
 }
 
 void *read_imei_thread(void *arg) {
@@ -735,6 +738,9 @@ int main(void) {
 
     // Set up periodic CAN data transmission every 3 seconds
     g_timeout_add_seconds(1, send_can_data_periodically, NULL);
+
+    // Set up periodic CAN data transmission every 3 seconds
+    g_timeout_add_seconds(5, print_can_data_periodically, NULL);
 
     // Start the mainloop
     g_main_loop_run(loop);
