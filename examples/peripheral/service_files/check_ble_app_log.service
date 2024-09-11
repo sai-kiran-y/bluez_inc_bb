@@ -1,0 +1,7 @@
+[Unit]
+Description=Check and clear ble_app.log if it exceeds 500MB
+
+[Service]
+Type=oneshot
+ExecStart=/home/root/ble_app_log_check_size.sh
+

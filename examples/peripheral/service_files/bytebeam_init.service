@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Scripts in /home/root on Startup
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/root/bytebeam_init.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
