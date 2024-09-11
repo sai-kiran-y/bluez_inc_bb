@@ -660,6 +660,35 @@ void *read_imei_thread(void *arg) {
     return NULL;
 }
 
+// Function to read dmesg and detect "hardware error"
+gboolean check_dmesg_for_errors(gpointer userdata) {
+    FILE *fp;
+    char buffer[256];
+
+    // Open the dmesg command for reading
+    fp = popen("dmesg | tail -n 1", "r");
+    if (fp == NULL) {
+        log_error(TAG, "Failed to run dmesg command");
+        sleep(1); // Sleep to avoid tight loop
+    }
+
+    // Read the output a line at a time
+    while (fgets(buffer, sizeof(buffer) - 1, fp) != NULL) {
+        if (strstr(buffer, "hardware error") || strstr(buffer, "Opcode 0x1003 failed: -110")) {
+            log_error(TAG, "Detected hardware error.");
+            pclose(fp);
+
+            // Call the shell script to handle hardware error and restart
+            system("./restart_app.sh");
+            return TRUE; // Exit thread after handling
+        }
+    }
+    // Close the dmesg command pipe
+    pclose(fp);
+    return TRUE;
+}
+
+
 int main(void) {
 
     log_set_level(LOG_DEBUG);
@@ -736,12 +765,15 @@ int main(void) {
 	// Start the timer to publish tcu_info every 1 second
 	g_timeout_add_seconds(1, publish_tcu_info_periodically, NULL);
 
-    // Set up periodic CAN data transmission every 3 seconds
+    // Set up periodic CAN data transmission every 1 second
     g_timeout_add_seconds(1, send_can_data_periodically, NULL);
 
-    // Set up periodic CAN data transmission every 3 seconds
+    // Set up periodic CAN data write every 5 seconds
     g_timeout_add_seconds(5, print_can_data_periodically, NULL);
 
+    // Set up periodic dmesg check, for BLE errors
+    g_timeout_add_seconds(1, check_dmesg_for_errors, NULL);
+    
     // Start the mainloop
     g_main_loop_run(loop);
 
