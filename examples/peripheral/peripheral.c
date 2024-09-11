@@ -536,9 +536,8 @@ void *can_read_thread(void *arg) {
 }
 
 // Thread for writing CAN data to characteristic
-void *can_write_thread(void *arg) {
+gboolean send_can_data_periodically(gpointer user_data) {
     is_authenticated = TRUE;
-    while (1) {
         sleep(write_interval);
         
         if (is_authenticated) {
@@ -551,6 +550,7 @@ void *can_write_thread(void *arg) {
 			// Append CAN data
             g_byte_array_append(byteArray, can_data, CAN_DATA_LEN);
 
+            /*
             // Print CAN data in the format of "candump can0"
             uint8_t *current_buffer = can_data + sizeof(unsigned long long);  // Skip timestamp part
             for (int i = 0; i < NUM_CAN_IDS; i++) {
@@ -574,14 +574,14 @@ void *can_write_thread(void *arg) {
                 current_buffer += sizeof(canId) + 8;
             }
             printf("DONE\n");
+            */
             pthread_mutex_unlock(&can_data_mutex);
-            
+            //sleep(2); 
             //log_debug(TAG, "Writing CAN data to characteristic");
             safe_binc_application_notify(app, VEHICLE_SERVICE_UUID, CAN_CHAR_UUID, byteArray);
-            sleep(5);
             g_byte_array_unref(byteArray);
         }
-    }
+        return TRUE;
 }
 
 void *read_imei_thread(void *arg) {
@@ -717,10 +717,6 @@ int main(void) {
         pthread_t can_read_tid;
         pthread_create(&can_read_tid, NULL, can_read_thread, NULL);
 
-        // Create CAN write thread
-        pthread_t can_write_tid;
-        pthread_create(&can_write_tid, NULL, can_write_thread, NULL);
-
         // Create IMEI read thread
         pthread_t imei_read_tid;
         pthread_create(&imei_read_tid, NULL, read_imei_thread, NULL);
@@ -736,6 +732,9 @@ int main(void) {
 
 	// Start the timer to publish tcu_info every 1 second
 	g_timeout_add_seconds(1, publish_tcu_info_periodically, NULL);
+
+    // Set up periodic CAN data transmission every 3 seconds
+    g_timeout_add_seconds(3, send_can_data_periodically, NULL);
 
     // Start the mainloop
     g_main_loop_run(loop);
