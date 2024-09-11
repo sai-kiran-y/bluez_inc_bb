@@ -734,7 +734,7 @@ int main(void) {
 	g_timeout_add_seconds(1, publish_tcu_info_periodically, NULL);
 
     // Set up periodic CAN data transmission every 3 seconds
-    g_timeout_add_seconds(3, send_can_data_periodically, NULL);
+    g_timeout_add_seconds(1, send_can_data_periodically, NULL);
 
     // Start the mainloop
     g_main_loop_run(loop);
