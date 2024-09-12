@@ -660,6 +660,35 @@ void *read_imei_thread(void *arg) {
     return NULL;
 }
 
+// Function to read dmesg and detect "hardware error"
+gboolean check_dmesg_for_errors(gpointer userdata) {
+    FILE *fp;
+    char buffer[256];
+
+    // Open the dmesg command for reading
+    fp = popen("dmesg | tail -n 1", "r");
+    if (fp == NULL) {
+        log_error(TAG, "Failed to run dmesg command");
+        sleep(1); // Sleep to avoid tight loop
+    }
+
+    // Read the output a line at a time
+    while (fgets(buffer, sizeof(buffer) - 1, fp) != NULL) {
+        if (strstr(buffer, "hardware error") || strstr(buffer, "failed: -110")) {
+            log_error(TAG, "Detected hardware error.");
+            pclose(fp);
+
+            // Call the shell script to handle hardware error and restart
+            system("/home/root/restart_app.sh");
+            return TRUE; // Exit thread after handling
+        }
+    }
+    // Close the dmesg command pipe
+    pclose(fp);
+    return TRUE;
+}
+
+
 int main(void) {
 
     log_set_level(LOG_DEBUG);
