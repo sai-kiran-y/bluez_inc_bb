@@ -674,7 +674,7 @@ gboolean check_dmesg_for_errors(gpointer userdata) {
 
     // Read the output a line at a time
     while (fgets(buffer, sizeof(buffer) - 1, fp) != NULL) {
-        if (strstr(buffer, "hardware error") || strstr(buffer, "failed: -110")) {
+        if (strstr(buffer, "hardware error") || strstr(buffer, "failed: -110") || strstr(buffer, "sending frame failed")) {
             log_error(TAG, "Detected hardware error.");
             pclose(fp);
 
