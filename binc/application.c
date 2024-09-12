@@ -1373,7 +1373,7 @@ void safe_binc_application_notify(const Application *app, const char *service_uu
 
     if (!success) {
         log_error(TAG, "Failed to notify after multiple retries, resetting Bluetooth adapter.");
-        system("hciconfig hci0 reset"); // Reset Bluetooth adapter on failure
+        //system("hciconfig hci0 reset"); // Reset Bluetooth adapter on failure
     }
 }
 
