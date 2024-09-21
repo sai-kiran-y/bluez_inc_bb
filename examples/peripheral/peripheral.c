@@ -57,7 +57,7 @@
 
 
 // Customizable interval for writing CAN data to characteristic (in seconds)
-#define DEFAULT_WRITE_INTERVAL 100
+#define DEFAULT_WRITE_INTERVAL 0
 
 #define AT_COMMAND "AT+GSN\r"
 #define DEVICE_PORT "/dev/ttyUSB0"
@@ -765,8 +765,8 @@ int main(void) {
 	// Start the timer to publish tcu_info every 1 second
 	g_timeout_add_seconds(1, publish_tcu_info_periodically, NULL);
 
-    // Set up periodic CAN data transmission every 3 seconds
-    g_timeout_add_seconds(1, send_can_data_periodically, NULL);
+    // Set up periodic CAN data transmission every 1 seconds
+    g_timeout_add(100, send_can_data_periodically, NULL);
 
     // Set up periodic CAN data transmission every 3 seconds
     g_timeout_add_seconds(5, print_can_data_periodically, NULL);
