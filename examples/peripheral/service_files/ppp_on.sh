@@ -1,0 +1,1 @@
+pppd call quectel-ppp &

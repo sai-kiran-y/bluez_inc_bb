@@ -1,0 +1,14 @@
+[Unit]
+Description=Bytebeam Initialization Script
+After=network.target dev-ttyUSB5.device
+
+[Service]
+ExecStart=/home/root/bytebeam_init.sh
+Type=simple
+RemainAfterExit=yes
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+[Unit]
+
