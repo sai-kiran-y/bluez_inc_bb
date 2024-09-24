@@ -760,13 +760,13 @@ int main(void) {
     //g_timeout_add_seconds(600, callback, loop);
 
 	// Start the timer to publish is_authenticated every 1 second
-	g_timeout_add_seconds(1, publish_is_authenticated_periodically, NULL);
+	g_timeout_add_seconds(5, publish_is_authenticated_periodically, NULL);
 
 	// Start the timer to publish tcu_info every 1 second
-	g_timeout_add_seconds(1, publish_tcu_info_periodically, NULL);
+	g_timeout_add_seconds(5, publish_tcu_info_periodically, NULL);
 
     // Set up periodic CAN data transmission every 1 seconds
-    g_timeout_add(100, send_can_data_periodically, NULL);
+    g_timeout_add_seconds(5, send_can_data_periodically, NULL);
 
     // Set up periodic CAN data transmission every 3 seconds
     g_timeout_add_seconds(5, print_can_data_periodically, NULL);
