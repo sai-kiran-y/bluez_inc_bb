@@ -689,13 +689,28 @@ gboolean check_dmesg_for_errors(gpointer userdata) {
 }
 
 
-int main(void) {
-
+int main(int argc, char *argv[]) {
     log_set_level(LOG_DEBUG);
 
     // Initialize can_data buffer
     memset(can_data, 0, CAN_DATA_LEN);
 
+    // Default timeout in milliseconds
+    int timeout_ms = 100;
+
+    // Parse the command line arguments
+    if (argc == 3 && strcmp(argv[1], "-f") == 0) {
+        timeout_ms = atoi(argv[2]);
+        if (timeout_ms <= 0) {
+            printf("Invalid timeout value. Please provide a valid positive integer.\n");
+            return 1;
+        }
+    } else {
+        printf("Usage: %s -f <timeout_in_ms>\n", argv[0]);
+        return 1;
+    }
+
+    printf("Using timeout: %d ms\n", timeout_ms);
     // Get a DBus connection
     GDBusConnection *dbusConnection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
 
@@ -760,13 +775,13 @@ int main(void) {
     //g_timeout_add_seconds(600, callback, loop);
 
 	// Start the timer to publish is_authenticated every 1 second
-	g_timeout_add_seconds(5, publish_is_authenticated_periodically, NULL);
+	g_timeout_add(timeout_ms, publish_is_authenticated_periodically, NULL);
 
 	// Start the timer to publish tcu_info every 1 second
-	g_timeout_add_seconds(5, publish_tcu_info_periodically, NULL);
+	g_timeout_add(timeout_ms, publish_tcu_info_periodically, NULL);
 
     // Set up periodic CAN data transmission every 1 seconds
-    g_timeout_add_seconds(5, send_can_data_periodically, NULL);
+    g_timeout_add(timeout_ms, send_can_data_periodically, NULL);
 
     // Set up periodic CAN data transmission every 3 seconds
     g_timeout_add_seconds(5, print_can_data_periodically, NULL);
