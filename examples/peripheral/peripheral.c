@@ -52,7 +52,7 @@
 #define NUM_CAN_IDS 11
 #define CAN_FRAME_SIZE sizeof(struct can_frame)
 #define TIMESTAMP_SIZE sizeof(struct timeval)
-#define CAN_DATA_LEN (NUM_CAN_IDS * (CAN_FRAME_SIZE + TIMESTAMP_SIZE + sizeof(canid_t)))
+#define CAN_DATA_LEN (TIMESTAMP_SIZE+ (NUM_CAN_IDS * (CAN_FRAME_SIZE + sizeof(canid_t))))
 #define TCU_INFO_MAX_LENGTH 18 // IMEI (15) + comma (1) + device ID (1) + null terminator (1)
 
 
