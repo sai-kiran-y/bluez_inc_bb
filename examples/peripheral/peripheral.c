@@ -682,7 +682,7 @@ gboolean check_dmesg_for_errors(gpointer userdata) {
             pclose(fp);
 
             // Call the shell script to handle hardware error and restart
-            system("/home/root/restart_app.sh");
+            //system("/home/root/restart_app.sh");
             return TRUE; // Exit thread after handling
         }
     }
