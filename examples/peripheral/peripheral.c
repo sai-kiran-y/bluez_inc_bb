@@ -606,7 +606,10 @@ void *read_imei_thread(void *arg) {
 	ssize_t n;
     while (1) {
         tcflush(tty_fd, TCIFLUSH);
-        write(tty_fd, at_cmd, strlen(at_cmd));
+        int write_ret = write(tty_fd, at_cmd, strlen(at_cmd));
+        if (write_ret == -1){
+            perror("Write failed");
+        }
         memset(buffer, 0, sizeof(buffer));
         usleep(100000);  // Small delay to allow the device to respond
 
