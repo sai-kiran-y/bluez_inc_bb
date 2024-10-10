@@ -560,6 +560,29 @@ gboolean send_can_data_periodically(gpointer user_data) {
 }
 
 gboolean print_can_data_periodically(gpointer user_data){
+// Get the current time
+    struct timeval tv;
+    gettimeofday(&tv, NULL);  // Get the current time in UTC
+
+    // Convert to broken-down time in UTC
+    struct tm *utc_time = gmtime(&tv.tv_sec);
+
+    // Convert UTC to IST (UTC + 5:30)
+    struct tm ist_time = *utc_time;
+    ist_time.tm_hour += 5;
+    ist_time.tm_min += 30;
+
+    // Adjust for day/month overflow if needed
+    mktime(&ist_time);  // Normalize the time structure after adjustment
+
+    // Buffer to store the formatted date and time
+    char timestamp[100];
+
+    // Format the date and time including day, month, year, and time
+    strftime(timestamp, sizeof(timestamp), "%A, %d %B %Y %H:%M:%S", &ist_time); // Format: Day, DD Month YYYY HH:MM:SS
+
+    // Print the timestamp
+    printf("Timestamp (IST): %s\n", timestamp);
 
     // Print CAN data in the format of "candump can0"
     uint8_t *current_buffer = can_data + sizeof(unsigned long long);  // Skip timestamp part
