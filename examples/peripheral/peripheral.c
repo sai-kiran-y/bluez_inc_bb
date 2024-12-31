@@ -49,7 +49,7 @@
 
 #define BLUEZ_ERROR_AUTHORIZATION_FAILED "org.bluez.Error.Failed"
 
-#define NUM_CAN_IDS 11
+#define NUM_CAN_IDS 18
 #define CAN_FRAME_SIZE sizeof(struct can_frame)
 #define TIMESTAMP_SIZE sizeof(struct timeval)
 #define CAN_DATA_LEN (NUM_CAN_IDS * (CAN_FRAME_SIZE + TIMESTAMP_SIZE + sizeof(canid_t)))
@@ -81,7 +81,8 @@ Application *app = NULL;
 static gboolean is_authenticated = FALSE;
 Device *connected_device = NULL;
 const canid_t monitored_can_ids[NUM_CAN_IDS] = {
-    0x407, 0x520, 0x201, 0x306, 0x303, 0x305, 0x302, 0x322, 0x307, 0x100, 0x500
+	0x407, 0x520, 0x201, 0x306, 0x303, 0x305, 0x302, 0x100, 0x500,
+    0x322, 0x307, 0x328, 0x308, 0x304, 0x531, 0x530, 0x501, 0x123
 };
 
 
