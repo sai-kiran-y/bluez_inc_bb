@@ -315,19 +315,18 @@ const char *on_local_char_write(const Application *application, const char *addr
         log_debug(TAG, "Received password: 0x%06x", received_password);
 
         if (received_password == DEFAULT_PASSWORD) {
-            is_authenticated = TRUE;
 
-            // Write "true" to IS_AUTHENTICATED_CHAR_UUID
-            //const uint8_t yes_value[] = {'t', 'r', 'u', 'e'};
-            //GByteArray *yesArray = g_byte_array_new();
-            //g_byte_array_append(yesArray, yes_value, sizeof(yes_value));
-            //binc_application_set_char_value(application, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, yesArray);
-            //g_byte_array_unref(yesArray, TRUE);
+            //Write "true" to IS_AUTHENTICATED_CHAR_UUID
+            const uint8_t yes_value[] = {'t', 'r', 'u', 'e'};
+            GByteArray *yesArray = g_byte_array_new();
+            g_byte_array_append(yesArray, yes_value, sizeof(yes_value));
+            binc_application_set_char_value(application, AUTH_SERVICE_UUID, IS_AUTHENTICATED_CHAR_UUID, yesArray);
+            g_byte_array_unref(yesArray, TRUE);
 
             log_info(TAG, "Authentication successful, 'yes' written to IS_AUTHENTICATED_CHAR_UUID");
 
             // Make VEHICLE_SERVICE_UUID visible
-            //ble_install_vehicle_service();
+            ble_install_vehicle_service();
         } else {
             log_error(TAG, "Authentication failed, received password: 0x%06x", received_password);
             // Disconnect the device
